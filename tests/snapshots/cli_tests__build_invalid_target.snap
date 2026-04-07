@@ -1,0 +1,19 @@
+---
+source: tests/cli_tests.rs
+info:
+  program: queso
+  args:
+    - build
+    - "--target"
+    - mips-linux
+    - "--erts"
+    - /tmp/erts
+---
+success: false
+exit_code: 2
+----- stdout -----
+
+----- stderr -----
+error: invalid value 'mips-linux' for '--target <TARGET>': unsupported architecture 'mips': expected x86_64 or aarch64
+
+For more information, try '--help'.

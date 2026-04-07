@@ -1,0 +1,23 @@
+---
+source: tests/cli_tests.rs
+info:
+  program: queso
+  args:
+    - build
+    - "--target"
+    - x86_64-linux-static
+    - "--target"
+    - aarch64-macos
+    - "--erts"
+    - /tmp/erts
+---
+success: false
+exit_code: 1
+----- stdout -----
+
+----- stderr -----
+Error: 
+   0: --erts cannot be used with multiple targets (each target needs a platform-specific ERTS)
+
+Location:
+   [FILE]:[LINE]

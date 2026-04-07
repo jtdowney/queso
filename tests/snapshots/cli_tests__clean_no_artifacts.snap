@@ -1,0 +1,13 @@
+---
+source: tests/cli_tests.rs
+info:
+  program: queso
+  args:
+    - clean
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+      Clean no build artifacts found

@@ -1,0 +1,10 @@
+name = "my_app"
+version = "2.1.0"
+target = "erlang"
+
+[tools.queso]
+entry = "my_app.cli"
+targets = ["aarch64-macos", "x86_64-linux-static"]
+strip_beam = false
+compression_level = 3
+full_erts = true

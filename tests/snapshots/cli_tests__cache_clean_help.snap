@@ -1,0 +1,20 @@
+---
+source: tests/cli_tests.rs
+info:
+  program: queso
+  args:
+    - cache
+    - clean
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Remove cached ERTS downloads and payloads
+
+Usage: queso cache clean
+
+Options:
+  -h, --help  Print help
+
+----- stderr -----

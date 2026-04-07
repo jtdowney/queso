@@ -1,0 +1,17 @@
+---
+source: tests/cli_tests.rs
+info:
+  program: queso
+  args:
+    - clean
+---
+success: false
+exit_code: 1
+----- stdout -----
+
+----- stderr -----
+Error: 
+   0: not a Gleam project: gleam.toml not found in [TEMPDIR]
+
+Location:
+   [FILE]:[LINE]

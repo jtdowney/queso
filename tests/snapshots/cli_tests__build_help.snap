@@ -1,0 +1,34 @@
+---
+source: tests/cli_tests.rs
+info:
+  program: queso
+  args:
+    - build
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Build a distributable executable
+
+Usage: queso build [OPTIONS]
+
+Options:
+      --target <TARGET>
+          Target platforms (e.g., x86_64-linux-static, aarch64-macos; defaults to current)
+      --erts <ERTS>
+          Path to Erlang/OTP installation (auto-downloaded if omitted)
+      --entry <ENTRY>
+          Entrypoint module (default: package root module)
+      --full-erts
+          Bundle the entire ERTS (skip tree shaking)
+      --strip-beam
+          Strip debug info from BEAM files (default)
+      --no-strip-beam
+          Don't strip debug info from BEAM files
+      --compression-level <COMPRESSION_LEVEL>
+          Zstd compression level (1-22, default: 9)
+  -h, --help
+          Print help
+
+----- stderr -----

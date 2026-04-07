@@ -1,0 +1,48 @@
+name: Update dependencies
+
+on:
+  schedule:
+    - cron: "0 10 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  update-dependencies:
+    name: Update dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Update dependencies
+        run: |
+          SUMMARY="$RUNNER_TEMP/update-summary.md"
+          echo "## Dependency Updates" > "$SUMMARY"
+          echo "" >> "$SUMMARY"
+
+          if UPDATE_OUTPUT=$(cargo update 2>&1); then
+            echo "✅ Dependencies updated successfully" >> "$SUMMARY"
+          else
+            echo "⚠️ Some updates may have failed" >> "$SUMMARY"
+          fi
+
+          echo "" >> "$SUMMARY"
+          echo "### Changes" >> "$SUMMARY"
+          echo '```' >> "$SUMMARY"
+          echo "$UPDATE_OUTPUT" >> "$SUMMARY"
+          echo '```' >> "$SUMMARY"
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/update-dependencies
+          delete-branch: true
+          commit-message: "chore: update dependencies"
+          title: "chore: update dependencies"
+          body-path: ${{ runner.temp }}/update-summary.md
+          labels: dependencies

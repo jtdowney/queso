@@ -1,0 +1,19 @@
+---
+source: tests/cli_tests.rs
+info:
+  program: queso
+  args:
+    - clean
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Remove build artifacts
+
+Usage: queso clean
+
+Options:
+  -h, --help  Print help
+
+----- stderr -----

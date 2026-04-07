@@ -1,0 +1,55 @@
+[package]
+name = "queso"
+version = "0.1.0"
+edition = "2024"
+authors = ["John Downey <jdowney@gmail.com>"]
+description = "Package Gleam apps into single native executables"
+license = "Apache-2.0"
+repository = "https://github.com/jtdowney/queso"
+readme = "README.md"
+keywords = ["gleam", "erlang", "beam", "packaging"]
+categories = ["development-tools::build-utils", "command-line-utilities"]
+exclude = ["tests/", "scripts/", ".github/"]
+
+[dependencies]
+camino = "1"
+camino-tempfile = "1"
+clap = { version = "4", features = ["derive"] }
+color-eyre = "0.6.5"
+console = "0.16.3"
+directories = "6"
+eyre = "0.6.12"
+flate2 = "1"
+hex = "0.4.3"
+indicatif = "0.18.4"
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.11.0"
+tar = "0.4.45"
+toml = "1"
+ureq = "3"
+walkdir = "2"
+zip = "8"
+zstd = "0.13.3"
+
+[dev-dependencies]
+camino-tempfile-ext = "0.3.3"
+insta = { version = "1", features = ["yaml", "filters"] }
+insta-cmd = "0.6.0"
+quickcheck = "1"
+quickcheck_macros = "1"
+regex = "1"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_errors_doc = "allow"
+implicit_hasher = "allow"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+opt-level = "z"
+panic = "abort"
+strip = true
+
+[profile.dev.package.insta]
+opt-level = 3
