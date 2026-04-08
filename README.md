@@ -46,9 +46,12 @@ With [Rust](https://rustup.rs) installed:
 cargo install --locked queso
 ```
 
-### Runtime dependencies
+## Package time dependencies
 
-Queso also needs [Gleam](https://gleam.run), [Zig](https://ziglang.org), and [Erlang](https://www.erlang.org) on your PATH.
+To run and package your app, queso also needs [Gleam](https://gleam.run), [Zig](https://ziglang.org), and [Erlang](https://www.erlang.org) on your PATH.
+
+> [!NOTE]
+> **Why Zig?** The Zig features for cross-compilation makes tools like queso much easier to build in a way that best supports all the platform targets. There is prior art for it being used in Burrito as well.
 
 ## Usage
 
