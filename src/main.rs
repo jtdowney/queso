@@ -1,10 +1,13 @@
 mod cli;
 
-use std::{collections::HashMap, env, fs};
+use std::{
+    collections::{HashMap, HashSet},
+    env, fs,
+};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{Args, Parser, Subcommand};
-use eyre::Result;
+use eyre::{Result, ensure, eyre};
 use indicatif::HumanBytes;
 use queso::{
     Metadata,
@@ -105,15 +108,23 @@ struct ResolvedBuild {
 
 fn build(args: &BuildArgs) -> Result<()> {
     let cwd = Utf8PathBuf::from_path_buf(env::current_dir()?)
-        .map_err(|p| eyre::eyre!("non-UTF-8 working directory: {}", p.display()))?;
+        .map_err(|p| eyre!("non-UTF-8 working directory: {}", p.display()))?;
     let project = Project::load(&cwd)?;
-    let targets = project.resolve_targets(&args.target)?;
-
-    if args.erts.is_some() && targets.len() > 1 {
-        eyre::bail!(
+    let targets = if args.erts.is_some() {
+        ensure!(
+            args.target.len() <= 1,
             "--erts cannot be used with multiple targets (each target needs a platform-specific ERTS)"
         );
-    }
+
+        let target = args
+            .target
+            .first()
+            .copied()
+            .map_or_else(Target::current, Ok)?;
+        HashSet::from([target])
+    } else {
+        project.resolve_targets(&args.target)?
+    };
 
     let cli_strip_beam = match (args.strip_beam, args.no_strip_beam) {
         (true, _) => Some(true),
@@ -190,7 +201,7 @@ fn build(args: &BuildArgs) -> Result<()> {
 fn clean() -> Result<()> {
     let printer = cli::Printer::stderr();
     let cwd = Utf8PathBuf::from_path_buf(env::current_dir()?)
-        .map_err(|p| eyre::eyre!("non-UTF-8 working directory: {}", p.display()))?;
+        .map_err(|p| eyre!("non-UTF-8 working directory: {}", p.display()))?;
     let project = Project::load(&cwd)?;
     let dir = project.root.join("build").join("queso");
 
