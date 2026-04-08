@@ -160,8 +160,18 @@ pub fn download_url(otp_version: &str, target: &Target) -> Result<String> {
     match (target.os, target.arch) {
         (Os::Macos, Arch::X86_64) => Ok(macos_url(otp_version, "amd64")),
         (Os::Macos, Arch::Aarch64) => Ok(macos_url(otp_version, "arm64")),
-        (Os::Linux(libc), Arch::X86_64) => Ok(linux_url(otp_version, "x64", libc)),
-        (Os::Linux(libc), Arch::Aarch64) => Ok(linux_url(otp_version, "arm64", libc)),
+        (Os::Linux(libc), arch @ (Arch::X86_64 | Arch::Aarch64)) => {
+            let libc_suffix = match libc {
+                Libc::Glibc => "-glibc",
+                Libc::Musl => "-musl",
+                Libc::Static => "",
+            };
+            let arch_str = match arch {
+                Arch::X86_64 => "x64",
+                Arch::Aarch64 => "arm64",
+            };
+            Ok(linux_url(otp_version, arch_str, libc_suffix))
+        }
         (Os::Windows, Arch::X86_64) => Ok(windows_url(otp_version)),
         _ => bail!(
             "no OTP download available for {target} (use --erts to provide a local Erlang/OTP installation)"
@@ -175,14 +185,9 @@ fn macos_url(version: &str, arch: &str) -> String {
     )
 }
 
-fn linux_url(version: &str, arch: &str, libc: Libc) -> String {
-    let suffix = match libc {
-        Libc::Glibc => "-glibc",
-        Libc::Musl => "-musl",
-        Libc::Static => "",
-    };
+fn linux_url(version: &str, arch: &str, libc_suffix: &str) -> String {
     format!(
-        "https://github.com/gleam-community/erlang-linux-builds/releases/download/OTP-{version}/erlang-{version}-{arch}{suffix}.tar.gz"
+        "https://github.com/gleam-community/erlang-linux-builds/releases/download/OTP-{version}/erlang-{version}-{arch}{libc_suffix}.tar.gz"
     )
 }
 
