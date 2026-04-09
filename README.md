@@ -1,5 +1,8 @@
 # Queso
 
+[![CI](https://github.com/jtdowney/queso/actions/workflows/ci.yml/badge.svg)](https://github.com/jtdowney/queso/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/queso)](https://crates.io/crates/queso)
+
 Package Gleam applications into single native executables. The output binary bundles compiled BEAM bytecode and an Erlang runtime, so it runs on machines without Erlang installed.
 
 Inspired by [Burrito](https://github.com/burrito-elixir/burrito), built for Gleam. Because sometimes you go out to get a burrito, but all you really want is the queso.
