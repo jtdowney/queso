@@ -54,7 +54,7 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "28"
-          gleam-version: "1.15.2"
+          gleam-version: "1.15.4"
       - uses: mlugg/setup-zig@v2
         with:
           version: "0.15.2"
@@ -73,7 +73,7 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "28"
-          gleam-version: "1.15.2"
+          gleam-version: "1.15.4"
       - uses: mlugg/setup-zig@v2
         with:
           version: "0.15.2"
