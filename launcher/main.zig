@@ -196,7 +196,8 @@ fn bootErts(allocator: std.mem.Allocator, init: std.process.Init, erts_dir: []co
     try argv.append(allocator, "erlang");
     try argv.append(allocator, "halt");
 
-    var args_iter = std.process.Args.Iterator.init(init.minimal.args);
+    var args_iter = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
+    defer args_iter.deinit();
     _ = args_iter.skip();
     var has_extra = false;
     while (args_iter.next()) |arg| {
