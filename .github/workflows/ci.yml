@@ -57,7 +57,7 @@ jobs:
           gleam-version: "1.15.4"
       - uses: mlugg/setup-zig@v2
         with:
-          version: "0.15.2"
+          version: "0.16.0"
       - name: Run E2E test
         shell: bash
         run: bash scripts/e2e-test.sh
@@ -76,7 +76,7 @@ jobs:
           gleam-version: "1.15.4"
       - uses: mlugg/setup-zig@v2
         with:
-          version: "0.15.2"
+          version: "0.16.0"
       - name: Build queso
         run: cargo build --release
       - name: Cross-compile test app
