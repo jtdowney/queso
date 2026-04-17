@@ -168,51 +168,52 @@ mod test {
 
     use super::*;
 
+    const ALL_TARGETS: &[Target] = &[
+        Target {
+            os: Os::Linux(Libc::Glibc),
+            arch: Arch::X86_64,
+        },
+        Target {
+            os: Os::Linux(Libc::Glibc),
+            arch: Arch::Aarch64,
+        },
+        Target {
+            os: Os::Linux(Libc::Musl),
+            arch: Arch::X86_64,
+        },
+        Target {
+            os: Os::Linux(Libc::Musl),
+            arch: Arch::Aarch64,
+        },
+        Target {
+            os: Os::Linux(Libc::Static),
+            arch: Arch::X86_64,
+        },
+        Target {
+            os: Os::Linux(Libc::Static),
+            arch: Arch::Aarch64,
+        },
+        Target {
+            os: Os::Macos,
+            arch: Arch::X86_64,
+        },
+        Target {
+            os: Os::Macos,
+            arch: Arch::Aarch64,
+        },
+        Target {
+            os: Os::Windows,
+            arch: Arch::X86_64,
+        },
+        Target {
+            os: Os::Windows,
+            arch: Arch::Aarch64,
+        },
+    ];
+
     impl Arbitrary for Target {
         fn arbitrary(g: &mut Gen) -> Self {
-            let targets = [
-                Target {
-                    os: Os::Linux(Libc::Glibc),
-                    arch: Arch::X86_64,
-                },
-                Target {
-                    os: Os::Linux(Libc::Glibc),
-                    arch: Arch::Aarch64,
-                },
-                Target {
-                    os: Os::Linux(Libc::Musl),
-                    arch: Arch::X86_64,
-                },
-                Target {
-                    os: Os::Linux(Libc::Musl),
-                    arch: Arch::Aarch64,
-                },
-                Target {
-                    os: Os::Linux(Libc::Static),
-                    arch: Arch::X86_64,
-                },
-                Target {
-                    os: Os::Linux(Libc::Static),
-                    arch: Arch::Aarch64,
-                },
-                Target {
-                    os: Os::Macos,
-                    arch: Arch::X86_64,
-                },
-                Target {
-                    os: Os::Macos,
-                    arch: Arch::Aarch64,
-                },
-                Target {
-                    os: Os::Windows,
-                    arch: Arch::X86_64,
-                },
-                Target {
-                    os: Os::Windows,
-                    arch: Arch::Aarch64,
-                },
-            ];
-            *g.choose(&targets).unwrap()
+            *g.choose(ALL_TARGETS).unwrap()
         }
     }
 
@@ -224,86 +225,50 @@ mod test {
     }
 
     #[test]
-    fn test_invalid_os() {
-        let err = "x86_64-bsd".parse::<Target>().unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "unsupported OS 'bsd': expected linux, macos, or windows"
-        );
+    fn test_parse_errors() {
+        let cases = [
+            "linux",
+            "mips64-linux-glibc",
+            "x86_64-bsd",
+            "x86_64-linux",
+            "x86_64-linux-foobar",
+        ];
+        let report: String = cases
+            .iter()
+            .map(|input| {
+                let err = input.parse::<Target>().unwrap_err();
+                format!("{input} -> {err}")
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        insta::assert_snapshot!(report, @r"
+        linux -> invalid target format 'linux': expected <arch>-<os>
+        mips64-linux-glibc -> unsupported architecture 'mips64': expected x86_64 or aarch64
+        x86_64-bsd -> unsupported OS 'bsd': expected linux, macos, or windows
+        x86_64-linux -> invalid target format 'x86_64-linux': linux requires a libc variant (linux-glibc, linux-musl, or linux-static)
+        x86_64-linux-foobar -> unsupported libc variant 'foobar': expected glibc, musl, or static
+        ");
     }
 
     #[test]
-    fn test_missing_separator() {
-        let err = "linux".parse::<Target>().unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "invalid target format 'linux': expected <arch>-<os>"
-        );
-    }
+    fn test_rust_target_and_exe_suffix() {
+        let expectations: &[(&str, &str, &str)] = &[
+            ("x86_64-linux-glibc", "x86_64-unknown-linux-gnu", ""),
+            ("aarch64-linux-glibc", "aarch64-unknown-linux-gnu", ""),
+            ("x86_64-linux-musl", "x86_64-unknown-linux-musl", ""),
+            ("aarch64-linux-musl", "aarch64-unknown-linux-musl", ""),
+            ("x86_64-linux-static", "x86_64-unknown-linux-musl", ""),
+            ("aarch64-linux-static", "aarch64-unknown-linux-musl", ""),
+            ("x86_64-macos", "x86_64-apple-darwin", ""),
+            ("aarch64-macos", "aarch64-apple-darwin", ""),
+            ("x86_64-windows", "x86_64-pc-windows-gnu", ".exe"),
+            ("aarch64-windows", "aarch64-pc-windows-gnu", ".exe"),
+        ];
 
-    #[test]
-    fn test_linux_requires_libc_variant() {
-        let err = "x86_64-linux".parse::<Target>().unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "invalid target format 'x86_64-linux': linux requires a libc variant (linux-glibc, linux-musl, or linux-static)"
-        );
-    }
-
-    #[test]
-    fn test_invalid_libc_variant() {
-        let err = "x86_64-linux-foobar".parse::<Target>().unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "unsupported libc variant 'foobar': expected glibc, musl, or static"
-        );
-    }
-
-    #[test]
-    fn test_aarch64_windows_parses() {
-        let target = "aarch64-windows".parse::<Target>().unwrap();
-        assert_eq!(target.arch, Arch::Aarch64);
-        assert_eq!(target.os, Os::Windows);
-    }
-
-    #[test]
-    fn test_exe_suffix() {
-        assert_eq!(
-            "x86_64-linux-static"
-                .parse::<Target>()
-                .unwrap()
-                .exe_suffix(),
-            ""
-        );
-        assert_eq!(
-            "x86_64-windows".parse::<Target>().unwrap().exe_suffix(),
-            ".exe"
-        );
-    }
-
-    #[test]
-    fn test_rust_target() {
-        assert_eq!(
-            "x86_64-linux-glibc"
-                .parse::<Target>()
-                .unwrap()
-                .rust_target(),
-            "x86_64-unknown-linux-gnu"
-        );
-        assert_eq!(
-            "x86_64-linux-static"
-                .parse::<Target>()
-                .unwrap()
-                .rust_target(),
-            "x86_64-unknown-linux-musl"
-        );
-        assert_eq!(
-            "aarch64-macos".parse::<Target>().unwrap().rust_target(),
-            "aarch64-apple-darwin"
-        );
-        assert_eq!(
-            "x86_64-windows".parse::<Target>().unwrap().rust_target(),
-            "x86_64-pc-windows-gnu"
-        );
+        for (input, expected_rust, expected_suffix) in expectations {
+            let target: Target = input.parse().unwrap();
+            assert_eq!(target.rust_target(), *expected_rust);
+            assert_eq!(target.exe_suffix(), *expected_suffix);
+        }
     }
 }

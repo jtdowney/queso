@@ -556,21 +556,23 @@ mod test {
     }
 
     #[test]
-    fn test_is_erts_binary_linux() {
-        assert!(is_erts_binary("erts-16.3/bin/erlexec"));
-        assert!(is_erts_binary("erts-16.3/bin/beam.smp"));
-        assert!(is_erts_binary("erts-16.3/bin/erlc"));
-        assert!(is_erts_binary("bin/erl"));
-        assert!(!is_erts_binary("erts-16.3/ebin/init.beam"));
-        assert!(!is_erts_binary("lib/kernel-10.6.1/ebin/kernel.beam"));
-    }
+    fn test_is_erts_binary() {
+        let cases: &[(&str, bool)] = &[
+            ("erts-16.3/bin/erlexec", true),
+            ("erts-16.3/bin/beam.smp", true),
+            ("erts-16.3/bin/erlc", true),
+            ("bin/erl", true),
+            ("erts-16.3/bin/erl.exe", true),
+            ("erts-16.3/bin/beam.smp.dll", true),
+            ("erts-16.3/bin/erlexec.dll", true),
+            ("erts-16.3/bin/erlc.exe", true),
+            ("erts-16.3/ebin/init.beam", false),
+            ("lib/kernel-10.6.1/ebin/kernel.beam", false),
+        ];
 
-    #[test]
-    fn test_is_erts_binary_windows() {
-        assert!(is_erts_binary("erts-16.3/bin/erl.exe"));
-        assert!(is_erts_binary("erts-16.3/bin/beam.smp.dll"));
-        assert!(is_erts_binary("erts-16.3/bin/erlexec.dll"));
-        assert!(is_erts_binary("erts-16.3/bin/erlc.exe"));
+        for (path, expected) in cases {
+            assert_eq!(is_erts_binary(path), *expected);
+        }
     }
 
     #[test]

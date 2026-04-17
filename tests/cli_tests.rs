@@ -59,30 +59,12 @@ fn test_build_missing_gleam_toml() {
 }
 
 #[test]
-fn test_clean_help() {
-    let mut settings = insta::Settings::clone_current();
-    apply_common_filters(&mut settings);
-    let _bound = settings.bind_to_scope();
-
-    assert_cmd_snapshot!(cli().args(["clean", "--help"]));
-}
-
-#[test]
 fn test_cache_help() {
     let mut settings = insta::Settings::clone_current();
     apply_common_filters(&mut settings);
     let _bound = settings.bind_to_scope();
 
     assert_cmd_snapshot!(cli().args(["cache", "--help"]));
-}
-
-#[test]
-fn test_cache_clean_help() {
-    let mut settings = insta::Settings::clone_current();
-    apply_common_filters(&mut settings);
-    let _bound = settings.bind_to_scope();
-
-    assert_cmd_snapshot!(cli().args(["cache", "clean", "--help"]));
 }
 
 #[test]

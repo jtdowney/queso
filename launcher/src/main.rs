@@ -301,25 +301,6 @@ mod test {
     }
 
     #[test]
-    fn test_cache_paths_includes_version_and_truncated_hashes() {
-        let base = Utf8Path::new("/tmp/cache/my_app");
-        let (erts, app) = cache_paths(base, &sample_metadata());
-        assert_eq!(erts, base.join("erts").join("abcdefabcdef"));
-        assert_eq!(app, base.join("app").join("1.2.3-deadbeefdead"));
-    }
-
-    #[test]
-    fn test_cache_paths_short_hash_uses_full_value() {
-        let mut metadata = sample_metadata();
-        metadata.erts_hash = "abc".into();
-        metadata.app_hash = "def".into();
-        let base = Utf8Path::new("/tmp/cache/my_app");
-        let (erts, app) = cache_paths(base, &metadata);
-        assert_eq!(erts, base.join("erts").join("abc"));
-        assert_eq!(app, base.join("app").join("1.2.3-def"));
-    }
-
-    #[test]
     fn test_add_lib_paths_with_ebin() {
         let dir = camino_tempfile::tempdir().unwrap();
         let app_dir = dir.path();

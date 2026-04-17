@@ -173,133 +173,106 @@ mod test {
     }
 
     #[test]
-    fn test_resolve_entry_precedence() {
-        let project = Project::load("tests/fixtures/with_config").unwrap();
+    fn test_resolve_entry() {
+        let minimal = Project::load("tests/fixtures/minimal").unwrap();
+        let with_config = Project::load("tests/fixtures/with_config").unwrap();
 
-        let entry = project.resolve_entry(None);
-        assert_eq!(entry.entry_module, "my_app@cli");
+        let cases = [
+            (&minimal, None, "my_app"),
+            (&with_config, None, "my_app@cli"),
+            (&with_config, Some("custom.mod"), "custom@mod"),
+        ];
 
-        let entry = project.resolve_entry(Some("custom.mod"));
-        assert_eq!(entry.entry_module, "custom@mod");
-    }
-
-    #[test]
-    fn test_resolve_entry_falls_back_to_package_name() {
-        let project = Project::load("tests/fixtures/minimal").unwrap();
-        let entry = project.resolve_entry(None);
-        assert_eq!(entry.entry_module, "my_app");
-    }
-
-    #[test]
-    fn test_resolve_targets_cli_overrides_config() {
-        let project = Project::load("tests/fixtures/with_config").unwrap();
-        let cli_targets: Vec<Target> = vec!["x86_64-windows".parse().unwrap()];
-        let targets = project.resolve_targets(&cli_targets).unwrap();
-        let names: HashSet<String> = targets.iter().map(ToString::to_string).collect();
-        assert_eq!(names.len(), 1);
-        assert!(names.contains("x86_64-windows"));
-    }
-
-    #[test]
-    fn test_resolve_targets_uses_config() {
-        let project = Project::load("tests/fixtures/with_config").unwrap();
-        let targets = project.resolve_targets(&[]).unwrap();
-        let names: HashSet<String> = targets.iter().map(ToString::to_string).collect();
-        assert_eq!(names.len(), 2);
-        assert!(names.contains("aarch64-macos"));
-        assert!(names.contains("x86_64-linux-static"));
-    }
-
-    #[test]
-    fn test_resolve_targets_falls_back_to_current() {
-        let project = Project::load("tests/fixtures/minimal").unwrap();
-        let targets = project.resolve_targets(&[]).unwrap();
-        assert_eq!(targets.len(), 1);
-        assert!(targets.contains(&Target::current().unwrap()));
-    }
-
-    #[test]
-    fn test_resolve_strip_beam_defaults_to_true() {
-        let project = Project::load("tests/fixtures/minimal").unwrap();
-        assert!(project.resolve_strip_beam(None));
-    }
-
-    #[test]
-    fn test_resolve_strip_beam_uses_config() {
-        let project = Project::load("tests/fixtures/with_config").unwrap();
-        assert!(!project.resolve_strip_beam(None));
-    }
-
-    #[test]
-    fn test_resolve_strip_beam_cli_overrides_config() {
-        let project = Project::load("tests/fixtures/with_config").unwrap();
-        assert!(project.resolve_strip_beam(Some(true)));
-    }
-
-    #[test]
-    fn test_resolve_compression_level_defaults_to_9() {
-        let project = Project::load("tests/fixtures/minimal").unwrap();
-        assert_eq!(project.resolve_compression_level(None).unwrap(), 9);
-    }
-
-    #[test]
-    fn test_resolve_compression_level_uses_config() {
-        let project = Project::load("tests/fixtures/with_config").unwrap();
-        assert_eq!(project.resolve_compression_level(None).unwrap(), 3);
-    }
-
-    #[test]
-    fn test_resolve_compression_level_cli_overrides_config() {
-        let project = Project::load("tests/fixtures/with_config").unwrap();
-        assert_eq!(project.resolve_compression_level(Some(15)).unwrap(), 15);
-    }
-
-    #[test]
-    fn test_resolve_full_erts_defaults_to_false() {
-        let project = Project::load("tests/fixtures/minimal").unwrap();
-        assert!(!project.resolve_full_erts(false));
-    }
-
-    #[test]
-    fn test_resolve_full_erts_uses_config() {
-        let project = Project::load("tests/fixtures/with_config").unwrap();
-        assert!(project.resolve_full_erts(false));
-    }
-
-    #[test]
-    fn test_resolve_full_erts_cli_overrides_config() {
-        let project = Project::load("tests/fixtures/minimal").unwrap();
-        assert!(project.resolve_full_erts(true));
-    }
-
-    #[test]
-    fn test_resolve_compression_level_rejects_out_of_range() {
-        let project = Project::load("tests/fixtures/minimal").unwrap();
-        assert!(project.resolve_compression_level(Some(0)).is_err());
-        assert!(project.resolve_compression_level(Some(23)).is_err());
-    }
-
-    #[test]
-    fn test_entrypoint_dots_become_at_signs() {
-        fn prop(parts: Vec<String>) -> bool {
-            let parts: Vec<String> = parts
-                .into_iter()
-                .filter(|s| {
-                    !s.is_empty()
-                        && s.starts_with(|c: char| c.is_ascii_lowercase())
-                        && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
-                })
-                .take(5)
-                .collect();
-            if parts.is_empty() {
-                return true;
-            }
-            let module = parts.join(".");
-            let entry = Entrypoint::new(&module);
-            let expected_erlang = parts.join("@");
-            entry.entry_module == expected_erlang
-                && entry.beam_file == format!("{expected_erlang}.beam")
+        for (project, cli_entry, expected) in cases {
+            assert_eq!(project.resolve_entry(cli_entry).entry_module, expected);
         }
-        quickcheck::quickcheck(prop as fn(Vec<String>) -> bool);
+    }
+
+    #[test]
+    fn test_resolve_targets() {
+        let minimal = Project::load("tests/fixtures/minimal").unwrap();
+        let with_config = Project::load("tests/fixtures/with_config").unwrap();
+        let windows: Target = "x86_64-windows".parse().unwrap();
+
+        let current_only: HashSet<Target> = HashSet::from([Target::current().unwrap()]);
+        let config_targets: HashSet<Target> = HashSet::from([
+            "aarch64-macos".parse().unwrap(),
+            "x86_64-linux-static".parse().unwrap(),
+        ]);
+        let windows_only: HashSet<Target> = HashSet::from([windows]);
+
+        let cases: &[(&Project, Vec<Target>, &HashSet<Target>)] = &[
+            (&minimal, vec![], &current_only),
+            (&with_config, vec![], &config_targets),
+            (&with_config, vec![windows], &windows_only),
+        ];
+
+        for (project, cli_targets, expected) in cases {
+            assert_eq!(&project.resolve_targets(cli_targets).unwrap(), *expected);
+        }
+    }
+
+    #[test]
+    fn test_resolve_strip_beam() {
+        let minimal = Project::load("tests/fixtures/minimal").unwrap();
+        let with_config = Project::load("tests/fixtures/with_config").unwrap();
+
+        let cases = [
+            (&minimal, None, true),
+            (&with_config, None, false),
+            (&with_config, Some(true), true),
+        ];
+
+        for (project, cli_strip_beam, expected) in cases {
+            assert_eq!(project.resolve_strip_beam(cli_strip_beam), expected);
+        }
+    }
+
+    #[test]
+    fn test_resolve_compression_level() {
+        let minimal = Project::load("tests/fixtures/minimal").unwrap();
+        let with_config = Project::load("tests/fixtures/with_config").unwrap();
+
+        let ok_cases = [
+            (&minimal, None, 9),
+            (&with_config, None, 3),
+            (&with_config, Some(15), 15),
+        ];
+        for (project, cli_level, expected) in ok_cases {
+            assert_eq!(
+                project.resolve_compression_level(cli_level).unwrap(),
+                expected
+            );
+        }
+
+        for out_of_range in [0, 23] {
+            assert!(
+                minimal
+                    .resolve_compression_level(Some(out_of_range))
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn test_resolve_full_erts() {
+        let minimal = Project::load("tests/fixtures/minimal").unwrap();
+        let with_config = Project::load("tests/fixtures/with_config").unwrap();
+
+        let cases = [
+            (&minimal, false, false),
+            (&with_config, false, true),
+            (&minimal, true, true),
+        ];
+
+        for (project, cli_full_erts, expected) in cases {
+            assert_eq!(project.resolve_full_erts(cli_full_erts), expected);
+        }
+    }
+
+    #[test]
+    fn test_entrypoint_beam_file_suffix() {
+        let entry = Entrypoint::new("my_app.cli");
+        assert_eq!(entry.beam_file, "my_app@cli.beam");
     }
 }

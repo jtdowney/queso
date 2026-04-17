@@ -59,6 +59,8 @@ pub fn validate(
 
 #[cfg(test)]
 mod test {
+    use quickcheck_macros::quickcheck;
+
     use super::*;
 
     fn apps(entries: &[(&str, &[&str])]) -> HashMap<String, Vec<String>> {
@@ -154,5 +156,31 @@ mod test {
         assert!(required.contains("stdlib"));
         assert!(required.contains("compiler"));
         assert!(required.contains("my_app"));
+    }
+
+    #[quickcheck]
+    fn test_resolve_closed_under_erts_deps(
+        shipment_entries: Vec<(u8, Vec<u8>)>,
+        erts_entries: Vec<(u8, Vec<u8>)>,
+    ) -> bool {
+        fn name(n: u8) -> String {
+            format!("app{}", n % 8)
+        }
+        fn to_graph(entries: Vec<(u8, Vec<u8>)>) -> HashMap<String, Vec<String>> {
+            entries
+                .into_iter()
+                .map(|(k, deps)| (name(k), deps.into_iter().map(name).collect()))
+                .collect()
+        }
+
+        let shipment_apps = to_graph(shipment_entries);
+        let erts_apps = to_graph(erts_entries);
+        let required = resolve(&shipment_apps, &erts_apps);
+
+        required.iter().all(|app| {
+            erts_apps
+                .get(app)
+                .is_none_or(|deps| deps.iter().all(|d| required.contains(d)))
+        })
     }
 }

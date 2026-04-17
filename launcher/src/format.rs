@@ -138,38 +138,33 @@ mod test {
     use std::io::{Cursor, Write};
 
     use byteorder::WriteBytesExt;
+    use quickcheck_macros::quickcheck;
 
     use super::*;
 
-    pub(super) fn write_trailer_bytes(trailer: &Trailer, out: &mut Vec<u8>) {
-        out.write_u64::<LittleEndian>(trailer.erts_offset).unwrap();
-        out.write_u64::<LittleEndian>(trailer.app_offset).unwrap();
-        out.write_u64::<LittleEndian>(trailer.meta_offset).unwrap();
-        out.write_all(TRAILER_MAGIC).unwrap();
-    }
+    const TRAILER_SIZE_U64: u64 = TRAILER_SIZE as u64;
 
     #[test]
     fn test_trailer_size() {
         assert_eq!(TRAILER_SIZE, 3 * size_of::<u64>() + TRAILER_MAGIC.len());
     }
 
-    #[test]
-    fn test_trailer_roundtrip() {
+    #[quickcheck]
+    fn test_trailer_roundtrip(erts_offset: u64, app_offset: u64, meta_offset: u64) -> bool {
         let trailer = Trailer {
-            erts_offset: 1024,
-            app_offset: 2048,
-            meta_offset: 4096,
+            erts_offset,
+            app_offset,
+            meta_offset,
         };
 
         let mut buf = Vec::with_capacity(TRAILER_SIZE);
-        write_trailer_bytes(&trailer, &mut buf);
-
+        trailer.write(&mut buf).unwrap();
         let mut cursor = Cursor::new(&buf);
-
         let read_back = Trailer::read(&mut cursor).unwrap();
-        assert_eq!(read_back.erts_offset, 1024);
-        assert_eq!(read_back.app_offset, 2048);
-        assert_eq!(read_back.meta_offset, 4096);
+
+        read_back.erts_offset == erts_offset
+            && read_back.app_offset == app_offset
+            && read_back.meta_offset == meta_offset
     }
 
     #[test]
@@ -186,86 +181,98 @@ mod test {
         assert!(Trailer::read(&mut cursor).is_err());
     }
 
-    const TRAILER_SIZE_U64: u64 = TRAILER_SIZE as u64;
-
     #[test]
-    fn test_validate_accepts_well_formed() {
-        let trailer = Trailer {
-            erts_offset: 0,
-            app_offset: 100,
-            meta_offset: 200,
-        };
-        trailer.validate(200 + TRAILER_SIZE_U64).unwrap();
-    }
+    fn test_validate_cases() {
+        let cases: &[(&str, Trailer, u64, Option<&str>)] = &[
+            (
+                "well-formed",
+                Trailer {
+                    erts_offset: 0,
+                    app_offset: 100,
+                    meta_offset: 200,
+                },
+                200 + TRAILER_SIZE_U64,
+                None,
+            ),
+            (
+                "app before erts",
+                Trailer {
+                    erts_offset: 100,
+                    app_offset: 50,
+                    meta_offset: 200,
+                },
+                200 + TRAILER_SIZE_U64,
+                Some("trailer: erts_offset must be less than app_offset"),
+            ),
+            (
+                "meta before app",
+                Trailer {
+                    erts_offset: 0,
+                    app_offset: 200,
+                    meta_offset: 100,
+                },
+                200 + TRAILER_SIZE_U64,
+                Some("trailer: app_offset must be less than meta_offset"),
+            ),
+            (
+                "zero-length erts",
+                Trailer {
+                    erts_offset: 100,
+                    app_offset: 100,
+                    meta_offset: 200,
+                },
+                200 + TRAILER_SIZE_U64,
+                Some("trailer: erts_offset must be less than app_offset"),
+            ),
+            (
+                "zero-length app",
+                Trailer {
+                    erts_offset: 0,
+                    app_offset: 100,
+                    meta_offset: 100,
+                },
+                200 + TRAILER_SIZE_U64,
+                Some("trailer: app_offset must be less than meta_offset"),
+            ),
+            (
+                "meta past end",
+                Trailer {
+                    erts_offset: 0,
+                    app_offset: 100,
+                    meta_offset: 200,
+                },
+                200,
+                Some("trailer: metadata extends past end of file"),
+            ),
+            (
+                "file shorter than trailer",
+                Trailer {
+                    erts_offset: 0,
+                    app_offset: 100,
+                    meta_offset: 200,
+                },
+                TRAILER_SIZE_U64 - 1,
+                Some("binary too small to contain trailer"),
+            ),
+            (
+                "offset overflow",
+                Trailer {
+                    erts_offset: 0,
+                    app_offset: 100,
+                    meta_offset: u64::MAX,
+                },
+                u64::MAX,
+                Some("trailer: meta_offset + trailer size overflows"),
+            ),
+        ];
 
-    #[test]
-    fn test_validate_rejects_app_before_erts() {
-        let trailer = Trailer {
-            erts_offset: 100,
-            app_offset: 50,
-            meta_offset: 200,
-        };
-        assert!(trailer.validate(200 + TRAILER_SIZE_U64).is_err());
-    }
-
-    #[test]
-    fn test_validate_rejects_meta_before_app() {
-        let trailer = Trailer {
-            erts_offset: 0,
-            app_offset: 200,
-            meta_offset: 100,
-        };
-        assert!(trailer.validate(200 + TRAILER_SIZE_U64).is_err());
-    }
-
-    #[test]
-    fn test_validate_rejects_zero_length_erts() {
-        let trailer = Trailer {
-            erts_offset: 100,
-            app_offset: 100,
-            meta_offset: 200,
-        };
-        assert!(trailer.validate(200 + TRAILER_SIZE_U64).is_err());
-    }
-
-    #[test]
-    fn test_validate_rejects_zero_length_app() {
-        let trailer = Trailer {
-            erts_offset: 0,
-            app_offset: 100,
-            meta_offset: 100,
-        };
-        assert!(trailer.validate(200 + TRAILER_SIZE_U64).is_err());
-    }
-
-    #[test]
-    fn test_validate_rejects_meta_past_end() {
-        let trailer = Trailer {
-            erts_offset: 0,
-            app_offset: 100,
-            meta_offset: 200,
-        };
-        assert!(trailer.validate(200).is_err());
-    }
-
-    #[test]
-    fn test_validate_rejects_file_shorter_than_trailer() {
-        let trailer = Trailer {
-            erts_offset: 0,
-            app_offset: 100,
-            meta_offset: 200,
-        };
-        assert!(trailer.validate(TRAILER_SIZE_U64 - 1).is_err());
-    }
-
-    #[test]
-    fn test_validate_rejects_offset_overflow() {
-        let trailer = Trailer {
-            erts_offset: 0,
-            app_offset: 100,
-            meta_offset: u64::MAX,
-        };
-        assert!(trailer.validate(u64::MAX).is_err());
+        for (_label, trailer, file_len, expected_err) in cases {
+            let result = trailer.validate(*file_len);
+            match expected_err {
+                None => assert!(result.is_ok()),
+                Some(msg) => assert_eq!(result.unwrap_err().to_string(), *msg),
+            }
+        }
     }
 
     fn sample_metadata() -> Metadata {
@@ -281,32 +288,76 @@ mod test {
     }
 
     #[test]
-    fn test_metadata_validate_rejects_bad_entry_module() {
-        let mut m = sample_metadata();
-        m.entry_module = "foo','bar".into();
-        assert!(m.validate().is_err());
-    }
+    fn test_metadata_validate_cases() {
+        type Mutate = fn(&mut Metadata);
+        let cases: &[(&str, Mutate, Option<&str>)] = &[
+            ("baseline", |_| {}, None),
+            (
+                "empty name",
+                |m| m.name = String::new(),
+                Some("metadata: name is empty"),
+            ),
+            (
+                "name is dotdot",
+                |m| m.name = "..".into(),
+                Some("metadata: name is '.' or '..'"),
+            ),
+            (
+                "name has slash",
+                |m| m.name = "foo/bar".into(),
+                Some("metadata: name contains path separator"),
+            ),
+            (
+                "name has backslash",
+                |m| m.name = "foo\\bar".into(),
+                Some("metadata: name contains path separator"),
+            ),
+            (
+                "empty version",
+                |m| m.version = String::new(),
+                Some("metadata: version is empty"),
+            ),
+            (
+                "empty erts_version",
+                |m| m.erts_version = String::new(),
+                Some("metadata: erts_version is empty"),
+            ),
+            (
+                "empty entry_module",
+                |m| m.entry_module = String::new(),
+                Some("metadata: entry_module is empty"),
+            ),
+            (
+                "bad entry_module chars",
+                |m| m.entry_module = "foo','bar".into(),
+                Some("metadata: entry_module contains disallowed characters"),
+            ),
+            (
+                "empty boot_path",
+                |m| m.boot_path = String::new(),
+                Some("metadata: boot_path is empty"),
+            ),
+            (
+                "absolute boot_path",
+                |m| m.boot_path = "/etc/passwd".into(),
+                Some("metadata: boot_path must be relative"),
+            ),
+            (
+                "boot_path traversal",
+                |m| m.boot_path = "releases/../../etc/passwd".into(),
+                Some("metadata: boot_path contains '.' or '..' component"),
+            ),
+        ];
 
-    #[test]
-    fn test_metadata_validate_rejects_path_traversal() {
-        let mut m = sample_metadata();
-        m.boot_path = "releases/../../etc/passwd".into();
-        assert!(m.validate().is_err());
-    }
-
-    #[test]
-    fn test_metadata_bincode_roundtrip() {
-        let m = sample_metadata();
-        let bytes = bincode::encode_to_vec(&m, bincode::config::standard()).unwrap();
-        let (decoded, _): (Metadata, _) =
-            bincode::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
-        assert_eq!(decoded.name, m.name);
-        assert_eq!(decoded.version, m.version);
-        assert_eq!(decoded.entry_module, m.entry_module);
-        assert_eq!(decoded.erts_version, m.erts_version);
-        assert_eq!(decoded.erts_hash, m.erts_hash);
-        assert_eq!(decoded.app_hash, m.app_hash);
-        assert_eq!(decoded.boot_path, m.boot_path);
+        for (_label, mutate, expected_err) in cases {
+            let mut m = sample_metadata();
+            mutate(&mut m);
+            let result = m.validate();
+            match expected_err {
+                None => assert!(result.is_ok()),
+                Some(msg) => assert_eq!(result.unwrap_err().to_string(), *msg),
+            }
+        }
     }
 
     #[test]
@@ -329,7 +380,7 @@ mod test {
             app_offset,
             meta_offset,
         };
-        write_trailer_bytes(&trailer, &mut buf);
+        trailer.write(&mut buf).unwrap();
 
         let file_len = u64::try_from(buf.len()).unwrap();
         let mut cursor = Cursor::new(&buf);

@@ -304,22 +304,15 @@ mod test {
     }
 
     #[test]
-    fn test_valid_erts() {
-        let dir = camino_tempfile::tempdir().unwrap();
-        create_mock_erts(&dir, "");
+    fn test_validate_accepts_mock_erts() {
+        for (suffix, target) in [("", &LINUX_TARGET), (".exe", &WINDOWS_TARGET)] {
+            let dir = camino_tempfile::tempdir().unwrap();
+            create_mock_erts(&dir, suffix);
 
-        let erts = validate(dir.path(), &LINUX_TARGET).unwrap();
-        assert_eq!(erts.version, "16.3");
-        assert!(erts.erts_dir.ends_with("erts-16.3"));
-    }
-
-    #[test]
-    fn test_valid_windows_erts() {
-        let dir = camino_tempfile::tempdir().unwrap();
-        create_mock_erts(&dir, ".exe");
-
-        let erts = validate(dir.path(), &WINDOWS_TARGET).unwrap();
-        assert_eq!(erts.version, "16.3");
+            let erts = validate(dir.path(), target).unwrap();
+            assert_eq!(erts.version, "16.3");
+            assert!(erts.erts_dir.ends_with("erts-16.3"));
+        }
     }
 
     #[test]
@@ -403,12 +396,6 @@ mod test {
             err.to_string(),
             "no OTP download available for aarch64-windows (use --erts to provide a local Erlang/OTP installation)"
         );
-    }
-
-    #[test]
-    fn test_aarch64_windows_has_no_download_url() {
-        let target = "aarch64-windows".parse::<Target>().unwrap();
-        assert!(download_url("28.4.1", &target).is_err());
     }
 
     #[test]

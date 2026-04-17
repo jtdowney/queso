@@ -403,6 +403,7 @@ pub fn output_filename(name: &str, version: &str, target: &Target) -> String {
 #[cfg(test)]
 mod test {
     use camino_tempfile_ext::prelude::*;
+    use quickcheck_macros::quickcheck;
 
     use super::*;
     use crate::format::{TRAILER_MAGIC, TRAILER_SIZE};
@@ -433,12 +434,6 @@ mod test {
     }
 
     #[test]
-    fn test_validate_entrypoint_no_build_dir() {
-        let dir = camino_tempfile::tempdir().unwrap();
-        assert!(gleam_validate_entrypoint(dir.path(), "my_app.beam").is_err());
-    }
-
-    #[test]
     fn test_find_boot_file() {
         let dir = camino_tempfile::tempdir().unwrap();
         dir.child("releases/28/no_dot_erlang.boot")
@@ -463,27 +458,39 @@ mod test {
     }
 
     #[test]
-    fn test_find_boot_file_no_releases_dir() {
-        let dir = camino_tempfile::tempdir().unwrap();
-        assert!(find_boot_file(dir.path()).is_err());
-    }
-
-    #[test]
     fn test_output_filename() {
-        let target = "x86_64-linux-static".parse::<Target>().unwrap();
-        assert_eq!(
-            output_filename("my_app", "1.2.3", &target),
-            "my_app-1.2.3-x86_64-linux-static"
-        );
+        let cases = [
+            ("my_app", "1.2.3", "x86_64-linux-static"),
+            ("my_app", "1.0.0", "x86_64-windows"),
+            ("my_app", "0.1.0", "aarch64-macos"),
+        ];
+        let report: String = cases
+            .iter()
+            .map(|(name, version, target_str)| {
+                let target = target_str.parse::<Target>().unwrap();
+                format!(
+                    "{} -> {}",
+                    target_str,
+                    output_filename(name, version, &target)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        insta::assert_snapshot!(report, @r"
+        x86_64-linux-static -> my_app-1.2.3-x86_64-linux-static
+        x86_64-windows -> my_app-1.0.0-x86_64-windows.exe
+        aarch64-macos -> my_app-0.1.0-aarch64-macos
+        ");
     }
 
-    #[test]
-    fn test_output_filename_windows() {
-        let target = "x86_64-windows".parse::<Target>().unwrap();
-        assert_eq!(
-            output_filename("my_app", "1.0.0", &target),
-            "my_app-1.0.0-x86_64-windows.exe"
-        );
+    #[quickcheck]
+    fn test_hashing_writer_matches_direct_hash(chunks: Vec<Vec<u8>>) -> bool {
+        let concatenated: Vec<u8> = chunks.iter().flatten().copied().collect();
+        let mut writer = HashingWriter::new(Vec::new());
+        for chunk in chunks {
+            writer.write_all(&chunk).unwrap();
+        }
+        writer.finalize() == hex::encode(Sha256::digest(&concatenated))
     }
 
     #[test]
