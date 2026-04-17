@@ -43,7 +43,7 @@ impl Target {
     pub fn rust_target(&self) -> String {
         match (&self.arch, &self.os) {
             (arch, Os::Macos) => format!("{arch}-apple-darwin"),
-            (arch, Os::Windows) => format!("{arch}-pc-windows-msvc"),
+            (arch, Os::Windows) => format!("{arch}-pc-windows-gnu"),
             (arch, Os::Linux(Libc::Glibc)) => format!("{arch}-unknown-linux-gnu"),
             (arch, Os::Linux(Libc::Musl | Libc::Static)) => format!("{arch}-unknown-linux-musl"),
         }
@@ -303,7 +303,7 @@ mod test {
         );
         assert_eq!(
             "x86_64-windows".parse::<Target>().unwrap().rust_target(),
-            "x86_64-pc-windows-msvc"
+            "x86_64-pc-windows-gnu"
         );
     }
 }
