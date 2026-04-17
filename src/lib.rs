@@ -1,7 +1,9 @@
 pub mod erl;
 pub mod erts;
-#[path = "../launcher/src/format.rs"]
+#[path = "../shared/format.rs"]
 pub mod format;
+#[doc(hidden)]
+pub mod pack;
 pub mod payload;
 pub mod project;
 pub mod strip;
@@ -210,7 +212,7 @@ pub fn ensure_launcher(target: &Target) -> Result<Utf8PathBuf> {
     ensure_launcher_source(&build_dir)?;
 
     let cross = is_cross_target(target);
-    let manifest_path = build_dir.join("Cargo.toml").into_string();
+    let manifest_path = build_dir.join("launcher").join("Cargo.toml").into_string();
     let subcommand = if cross { "zigbuild" } else { "build" };
 
     let output = Command::new("cargo")
@@ -239,6 +241,7 @@ pub fn ensure_launcher(target: &Target) -> Result<Utf8PathBuf> {
     }
 
     let built_binary = build_dir
+        .join("launcher")
         .join("target")
         .join(&rust_target)
         .join("release")

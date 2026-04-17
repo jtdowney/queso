@@ -1,3 +1,4 @@
+#[path = "../../shared/format.rs"]
 mod format;
 
 use std::{

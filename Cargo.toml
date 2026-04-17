@@ -1,3 +1,7 @@
+[workspace]
+members = [".", "xtask"]
+exclude = ["launcher"]
+
 [package]
 name = "queso"
 version = "0.3.0"
@@ -9,7 +13,17 @@ repository = "https://github.com/jtdowney/queso"
 readme = "README.md"
 keywords = ["gleam", "erlang", "beam", "packaging"]
 categories = ["development-tools::build-utils", "command-line-utilities"]
-exclude = ["tests/", "scripts/", ".github/"]
+include = [
+    "/src/**/*",
+    "/shared/**/*",
+    "/build.rs",
+    "/launcher-source.tar.zst",
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/LICENSE",
+    "/README.md",
+    "/CHANGELOG.md",
+]
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
