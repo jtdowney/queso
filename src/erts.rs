@@ -6,7 +6,7 @@ use std::{
 
 use camino::{Utf8Path, Utf8PathBuf};
 use directories::ProjectDirs;
-use eyre::{Context, Result, bail, ensure, eyre};
+use eyre::{Context, OptionExt, Result, bail, ensure};
 
 use crate::{
     HashingWriter,
@@ -43,7 +43,7 @@ pub fn validate(root: impl AsRef<Utf8Path>, target: &Target) -> Result<Erts> {
     let version = erts_dir
         .file_name()
         .and_then(|n| n.strip_prefix("erts-"))
-        .ok_or_else(|| eyre!("could not parse ERTS version"))?
+        .ok_or_eyre("could not parse ERTS version")?
         .to_string();
 
     let suffix = target.exe_suffix();
@@ -93,9 +93,7 @@ pub fn resolve(otp_version: impl Into<String>, target: &Target) -> Result<ErtsRe
         });
     }
 
-    let parent = cache_dir
-        .parent()
-        .ok_or_else(|| eyre!("cache dir has no parent"))?;
+    let parent = cache_dir.parent().ok_or_eyre("cache dir has no parent")?;
 
     fs::create_dir_all(parent).wrap_err("failed to create cache parent dir")?;
 
@@ -144,11 +142,11 @@ pub fn resolve(otp_version: impl Into<String>, target: &Target) -> Result<ErtsRe
 }
 
 fn cache_dir_for(otp_version: &str, target: Target) -> Result<Utf8PathBuf> {
-    let proj_dirs = ProjectDirs::from("", "", "queso")
-        .ok_or_else(|| eyre!("could not determine cache directory"))?;
+    let proj_dirs =
+        ProjectDirs::from("", "", "queso").ok_or_eyre("could not determine cache directory")?;
 
-    let cache_dir = Utf8Path::from_path(proj_dirs.cache_dir())
-        .ok_or_else(|| eyre!("non-UTF-8 cache directory"))?;
+    let cache_dir =
+        Utf8Path::from_path(proj_dirs.cache_dir()).ok_or_eyre("non-UTF-8 cache directory")?;
 
     Ok(cache_dir
         .join("erts")
@@ -288,7 +286,7 @@ mod test {
     use crate::target::{Arch, Os};
 
     const LINUX_TARGET: Target = Target {
-        os: Os::Linux(Libc::Static),
+        os: Os::Linux(Libc::Musl),
         arch: Arch::X86_64,
     };
 

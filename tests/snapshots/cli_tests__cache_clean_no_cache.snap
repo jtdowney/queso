@@ -6,11 +6,11 @@ info:
     - cache
     - clean
   env:
-    HOME: /var/folders/fk/81495npj7z34wyxybhx25z200000gn/T/.tmpfpjFSB
+    HOME: /var/folders/fk/81495npj7z34wyxybhx25z200000gn/T/.tmpjq4FL0
 ---
 success: true
 exit_code: 0
 ----- stdout -----
 
 ----- stderr -----
-      Clean no cache directory found
+          Clean no cache directory found

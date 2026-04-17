@@ -6,11 +6,11 @@ info:
     - cache
     - clean
   env:
-    HOME: /var/folders/fk/81495npj7z34wyxybhx25z200000gn/T/.tmppdZDjE
+    HOME: /var/folders/fk/81495npj7z34wyxybhx25z200000gn/T/.tmpeuzZop
 ---
 success: true
 exit_code: 0
 ----- stdout -----
 
 ----- stderr -----
-    Removed [HOME]/Library/Caches/queso (24 B)
+        Removed [HOME]/Library/Caches/queso (24 B)

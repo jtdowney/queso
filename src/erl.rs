@@ -6,7 +6,7 @@ use std::{
 };
 
 use camino::{Utf8Path, Utf8PathBuf};
-use eyre::{Context, Result, bail, ensure, eyre};
+use eyre::{Context, OptionExt, Result, bail, ensure, eyre};
 
 const ESCRIPT_SOURCE: &str = include_str!("erl/sidecar.erl");
 
@@ -38,7 +38,7 @@ impl Erl {
             child
                 .stdout
                 .take()
-                .ok_or_else(|| eyre!("failed to open escript stdout"))?,
+                .ok_or_eyre("failed to open escript stdout")?,
         );
 
         Ok(Self {
@@ -144,7 +144,7 @@ impl Erl {
             .child
             .stdin
             .as_mut()
-            .ok_or_else(|| eyre!("escript stdin is closed"))?;
+            .ok_or_eyre("escript stdin is closed")?;
         stdin
             .write_all(request.as_bytes())
             .wrap_err("escript process died unexpectedly")?;

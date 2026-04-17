@@ -1,28 +1,34 @@
 pub mod erl;
 pub mod erts;
+#[path = "../launcher/src/format.rs"]
+pub mod format;
 pub mod payload;
 pub mod project;
 pub mod strip;
 pub mod target;
 pub mod tree_shake;
 
-use std::{fmt::Write, fs, io, process::Command};
+use std::{
+    fs::{self, File},
+    io::{self, Seek, Write},
+    process::Command,
+};
 
 use camino::{Utf8Path, Utf8PathBuf};
-use camino_tempfile::Utf8TempDir;
 use directories::ProjectDirs;
-use eyre::{Context, Result, bail, ensure, eyre};
+use eyre::{Context, OptionExt, Result, bail, ensure, eyre};
 use sha2::{Digest, Sha256};
 
-use crate::target::Target;
+use crate::{format::Trailer, target::Target};
 
-pub const LAUNCHER_SOURCE: &str = include_str!("../launcher/main.zig");
+const LAUNCHER_SOURCE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/launcher-source.tar.zst"));
+const LAUNCHER_SOURCE_HASH: &str = env!("QUESO_LAUNCHER_SOURCE_HASH");
+const QUESO_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn cache_dir() -> Result<Utf8PathBuf> {
-    let proj_dirs = ProjectDirs::from("", "", "queso")
-        .ok_or_else(|| eyre!("could not determine cache directory"))?;
-    let dir = Utf8Path::from_path(proj_dirs.cache_dir())
-        .ok_or_else(|| eyre!("non-UTF-8 cache directory"))?;
+    let proj_dirs =
+        ProjectDirs::from("", "", "queso").ok_or_eyre("could not determine cache directory")?;
+    let dir = Utf8Path::from_path(proj_dirs.cache_dir()).ok_or_eyre("non-UTF-8 cache directory")?;
     Ok(dir.to_path_buf())
 }
 
@@ -56,79 +62,13 @@ impl<W: io::Write> io::Write for HashingWriter<W> {
     }
 }
 
-#[derive(Debug)]
-pub struct Metadata {
-    pub name: String,
-    pub version: String,
-    pub entry_module: String,
-    pub target: Target,
-    pub erts_version: String,
-    pub erts_hash: String,
-    pub app_hash: String,
-    pub boot_path: String,
-}
-
-impl Metadata {
-    #[must_use]
-    pub fn to_zig(&self) -> String {
-        let constants = [
-            ("name", self.name.as_str()),
-            ("version", self.version.as_str()),
-            ("entry_module", self.entry_module.as_str()),
-            ("target", &self.target.to_string()),
-            ("erts_version", self.erts_version.as_str()),
-            ("erts_hash", self.erts_hash.as_str()),
-            ("app_hash", self.app_hash.as_str()),
-            ("boot_path", self.boot_path.as_str()),
-        ];
-
-        constants
-            .into_iter()
-            .fold(String::new(), |mut out, (key, value)| {
-                let _ = writeln!(out, "pub const {key} = \"{}\";", escape_zig_string(value));
-                out
-            })
-    }
-}
-
-fn escape_zig_string(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '\\' => out.push_str("\\\\"),
-            '"' => out.push_str("\\\""),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if c.is_ascii_control() => {
-                let _ = write!(out, "\\x{:02x}", c as u32);
-            }
-            _ => out.push(c),
-        }
-    }
-    out
-}
-
-pub fn check_zig() -> Result<String> {
-    let output = Command::new("zig")
-        .arg("version")
-        .output()
-        .map_err(|_| eyre::eyre!("zig not found on PATH"))?;
-
-    ensure!(
-        output.status.success(),
-        "zig version failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-}
+pub use crate::format::Metadata;
 
 pub fn check_gleam() -> Result<String> {
     let output = Command::new("gleam")
         .arg("--version")
         .output()
-        .map_err(|_| eyre::eyre!("gleam not found on PATH"))?;
+        .wrap_err("gleam not found on PATH")?;
 
     ensure!(output.status.success(), "gleam --version failed");
 
@@ -136,6 +76,49 @@ pub fn check_gleam() -> Result<String> {
         .trim()
         .trim_start_matches("gleam ")
         .to_string())
+}
+
+pub fn check_zig() -> Result<String> {
+    if let Ok(output) = Command::new("zig").arg("version").output()
+        && output.status.success()
+    {
+        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
+    }
+
+    if let Ok(output) = Command::new("python3")
+        .args(["-m", "ziglang", "version"])
+        .output()
+        && output.status.success()
+    {
+        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
+    }
+
+    bail!(
+        "zig not found (install from https://ziglang.org/download/ or with: pip install ziglang)"
+    );
+}
+
+pub fn check_cargo_zigbuild() -> Result<String> {
+    let output = Command::new("cargo-zigbuild")
+        .arg("--version")
+        .output()
+        .wrap_err("cargo-zigbuild not found (install with: cargo install cargo-zigbuild)")?;
+
+    ensure!(
+        output.status.success(),
+        "cargo-zigbuild --version failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .trim_start_matches("cargo-zigbuild ")
+        .to_string())
+}
+
+#[must_use]
+pub fn is_cross_target(target: &Target) -> bool {
+    Target::current().is_ok_and(|current| current != *target)
 }
 
 pub fn gleam_build(project_root: impl AsRef<Utf8Path>) -> Result<()> {
@@ -211,50 +194,203 @@ pub fn find_boot_file(erts_root: impl AsRef<Utf8Path>) -> Result<String> {
     bail!("no_dot_erlang.boot not found in {releases_dir}");
 }
 
-pub fn compile_launcher(
-    target: &Target,
+pub fn ensure_launcher(target: &Target) -> Result<Utf8PathBuf> {
+    let cache_dir = cache_dir()?;
+    let rust_target = target.rust_target();
+    let key = format!("{QUESO_VERSION}-{}", &LAUNCHER_SOURCE_HASH[..12]);
+    let launcher_dir = cache_dir.join("launcher").join(&key).join(&rust_target);
+    let suffix = target.exe_suffix();
+    let launcher_path = launcher_dir.join(format!("queso-launcher{suffix}"));
+
+    if launcher_path.is_file() {
+        return Ok(launcher_path);
+    }
+
+    let build_dir = cache_dir.join("launcher-build").join(&key);
+    ensure_launcher_source(&build_dir)?;
+
+    let cross = is_cross_target(target);
+    let manifest_path = build_dir.join("Cargo.toml").into_string();
+    let subcommand = if cross { "zigbuild" } else { "build" };
+
+    let output = Command::new("cargo")
+        .args([
+            subcommand,
+            "--locked",
+            "--release",
+            "--target",
+            &rust_target,
+            "--manifest-path",
+            &manifest_path,
+        ])
+        .output()
+        .wrap_err_with(|| {
+            if cross {
+                "failed to run cargo zigbuild (install with: cargo install cargo-zigbuild)"
+                    .to_string()
+            } else {
+                "failed to run cargo build".to_string()
+            }
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("launcher compilation failed:\n{stderr}");
+    }
+
+    let built_binary = build_dir
+        .join("target")
+        .join(&rust_target)
+        .join("release")
+        .join(format!("queso-launcher{suffix}"));
+
+    ensure!(
+        built_binary.is_file(),
+        "compiled launcher not found at {built_binary}"
+    );
+
+    fs::create_dir_all(&launcher_dir)?;
+    let tmp_path = camino_tempfile::Builder::new().make_in(&launcher_dir, |tmp_path| {
+        fs::copy(&built_binary, tmp_path).map(|_| ())
+    })?;
+    tmp_path
+        .persist(&launcher_path)
+        .wrap_err_with(|| format!("failed to cache launcher at {launcher_path}"))?;
+
+    Ok(launcher_path)
+}
+
+fn ensure_launcher_source(build_dir: &Utf8Path) -> Result<()> {
+    if build_dir.is_dir() {
+        return Ok(());
+    }
+
+    let parent = build_dir
+        .parent()
+        .ok_or_eyre("launcher build dir has no parent")?;
+    fs::create_dir_all(parent)
+        .wrap_err_with(|| format!("failed to create launcher build parent {parent}"))?;
+
+    let tmp_dir = camino_tempfile::Builder::new()
+        .prefix("extracting.")
+        .tempdir_in(parent)
+        .wrap_err("failed to create temp dir for launcher source")?;
+
+    extract_launcher_source(tmp_dir.path())?;
+
+    let extracted = tmp_dir.keep();
+    match fs::rename(&extracted, build_dir) {
+        Ok(()) => Ok(()),
+        Err(err)
+            if matches!(
+                err.kind(),
+                io::ErrorKind::AlreadyExists | io::ErrorKind::DirectoryNotEmpty
+            ) && build_dir.is_dir() =>
+        {
+            fs::remove_dir_all(&extracted).ok();
+            Ok(())
+        }
+        Err(err) => {
+            fs::remove_dir_all(&extracted).ok();
+            Err(err).wrap_err_with(|| format!("failed to finalize launcher source at {build_dir}"))
+        }
+    }
+}
+
+fn extract_launcher_source(dest: &Utf8Path) -> Result<()> {
+    let decoder =
+        zstd::Decoder::new(LAUNCHER_SOURCE).wrap_err("failed to decompress launcher source")?;
+    let mut archive = tar::Archive::new(decoder);
+
+    for entry in archive
+        .entries()
+        .wrap_err("failed to read launcher source archive")?
+    {
+        let mut entry = entry?;
+        let path = entry.path()?.into_owned();
+        let dest_path = dest.as_std_path().join(&path);
+
+        if let Some(parent) = dest_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        if entry.header().entry_type().is_file() {
+            let mut file = File::create(&dest_path)?;
+            io::copy(&mut entry, &mut file)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn assemble_binary(
+    launcher_path: impl AsRef<Utf8Path>,
     erts_payload_path: impl AsRef<Utf8Path>,
     app_payload_path: impl AsRef<Utf8Path>,
     metadata: &Metadata,
     output_path: impl AsRef<Utf8Path>,
 ) -> Result<()> {
+    let launcher_path = launcher_path.as_ref();
     let erts_payload_path = erts_payload_path.as_ref();
     let app_payload_path = app_payload_path.as_ref();
     let output_path = output_path.as_ref();
-    let work_dir = Utf8TempDir::new().wrap_err("failed to create temp dir for Zig compilation")?;
+
     let output_dir = output_path
         .parent()
-        .ok_or_else(|| eyre::eyre!("output path has no parent directory: {output_path}"))?;
-
-    fs::write(work_dir.path().join("main.zig"), LAUNCHER_SOURCE)?;
-    fs::copy(erts_payload_path, work_dir.path().join("erts.tar.zst"))?;
-    fs::copy(app_payload_path, work_dir.path().join("app.tar.zst"))?;
-    fs::write(work_dir.path().join("config.zig"), metadata.to_zig())?;
+        .ok_or_else(|| eyre!("output path has no parent directory: {output_path}"))?;
 
     let tmp_path = camino_tempfile::Builder::new().make_in(output_dir, |tmp_path| {
-        let mut cmd = Command::new("zig");
-        cmd.arg("build-exe")
-            .arg("main.zig")
-            .args(["--name", "queso-launcher"])
-            .args(["-target", &target.zig_target()])
-            .arg(format!("-femit-bin={tmp_path}"))
-            .arg("-OReleaseSmall")
-            .current_dir(work_dir.path());
-
-        let result = cmd.output()?;
-        if !result.status.success() {
-            let stderr = String::from_utf8_lossy(&result.stderr);
-            return Err(io::Error::other(format!(
-                "zig compilation failed:\n{stderr}"
-            )));
-        }
-
-        Ok(())
+        assemble_binary_inner(
+            launcher_path,
+            erts_payload_path,
+            app_payload_path,
+            metadata,
+            tmp_path.as_str(),
+        )
+        .map_err(|e| io::Error::other(e.to_string()))
     })?;
 
     tmp_path
         .persist(output_path)
         .wrap_err_with(|| format!("failed to place binary at {output_path}"))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(output_path, fs::Permissions::from_mode(0o755))?;
+    }
+
+    Ok(())
+}
+
+fn assemble_binary_inner(
+    launcher_path: &Utf8Path,
+    erts_payload_path: &Utf8Path,
+    app_payload_path: &Utf8Path,
+    metadata: &Metadata,
+    output_path: &str,
+) -> Result<()> {
+    let mut out = File::create(output_path)?;
+
+    io::copy(&mut File::open(launcher_path)?, &mut out)?;
+
+    let erts = out.stream_position()?;
+    io::copy(&mut File::open(erts_payload_path)?, &mut out)?;
+
+    let app = out.stream_position()?;
+    io::copy(&mut File::open(app_payload_path)?, &mut out)?;
+
+    let meta = out.stream_position()?;
+    let meta_bytes = bincode::encode_to_vec(metadata, bincode::config::standard())
+        .wrap_err("failed to serialize metadata")?;
+    out.write_all(&meta_bytes)?;
+
+    let trailer = Trailer {
+        erts_offset: erts,
+        app_offset: app,
+        meta_offset: meta,
+    };
+    trailer.write(&mut out)?;
 
     Ok(())
 }
@@ -269,6 +405,7 @@ mod test {
     use camino_tempfile_ext::prelude::*;
 
     use super::*;
+    use crate::format::{TRAILER_MAGIC, TRAILER_SIZE};
 
     #[test]
     fn test_validate_entrypoint_found() {
@@ -350,50 +487,57 @@ mod test {
     }
 
     #[test]
-    fn test_metadata_zig_snapshot() {
+    fn test_assemble_binary_creates_valid_output() {
+        let dir = camino_tempfile::tempdir().unwrap();
+
+        dir.child("launcher").write_binary(b"FAKE_EXE").unwrap();
+        dir.child("erts.tar.zst")
+            .write_binary(b"ERTS_DATA")
+            .unwrap();
+        dir.child("app.tar.zst").write_binary(b"APP_DATA").unwrap();
+
         let metadata = Metadata {
             name: "my_app".into(),
             version: "1.2.3".into(),
             entry_module: "my_app@cli".into(),
-            target: "x86_64-linux-static".parse::<Target>().unwrap(),
             erts_version: "15.2.1".into(),
-            erts_hash: "abc1234567890def".into(),
-            app_hash: "0123456789abcdef".into(),
+            erts_hash: "abc123".into(),
+            app_hash: "def456".into(),
             boot_path: "releases/28/no_dot_erlang".into(),
         };
-        insta::assert_snapshot!(metadata.to_zig(), @r#"
-        pub const name = "my_app";
-        pub const version = "1.2.3";
-        pub const entry_module = "my_app@cli";
-        pub const target = "x86_64-linux-static";
-        pub const erts_version = "15.2.1";
-        pub const erts_hash = "abc1234567890def";
-        pub const app_hash = "0123456789abcdef";
-        pub const boot_path = "releases/28/no_dot_erlang";
-        "#);
-    }
 
-    #[test]
-    fn test_metadata_zig_escapes_special_chars() {
-        let metadata = Metadata {
-            name: "app\"with\\quotes".into(),
-            version: "1.0\n.0".into(),
-            entry_module: "app\t\r".into(),
-            target: "x86_64-linux-static".parse::<Target>().unwrap(),
-            erts_version: "15.0".into(),
-            erts_hash: "abc1234567890def".into(),
-            app_hash: "0123456789abcdef".into(),
-            boot_path: "releases/28/no_dot_erlang".into(),
-        };
-        insta::assert_snapshot!(metadata.to_zig(), @r#"
-        pub const name = "app\"with\\quotes";
-        pub const version = "1.0\n.0";
-        pub const entry_module = "app\t\r";
-        pub const target = "x86_64-linux-static";
-        pub const erts_version = "15.0";
-        pub const erts_hash = "abc1234567890def";
-        pub const app_hash = "0123456789abcdef";
-        pub const boot_path = "releases/28/no_dot_erlang";
-        "#);
+        let output = dir.path().join("output");
+        assemble_binary(
+            dir.path().join("launcher"),
+            dir.path().join("erts.tar.zst"),
+            dir.path().join("app.tar.zst"),
+            &metadata,
+            &output,
+        )
+        .unwrap();
+
+        let data = fs::read(output.as_std_path()).unwrap();
+
+        assert!(data.starts_with(b"FAKE_EXE"));
+
+        let trailer = &data[data.len() - TRAILER_SIZE..];
+        assert_eq!(&trailer[24..32], TRAILER_MAGIC);
+
+        let erts_offset =
+            usize::try_from(u64::from_le_bytes(trailer[0..8].try_into().unwrap())).unwrap();
+        let app_offset =
+            usize::try_from(u64::from_le_bytes(trailer[8..16].try_into().unwrap())).unwrap();
+        let meta_offset =
+            usize::try_from(u64::from_le_bytes(trailer[16..24].try_into().unwrap())).unwrap();
+
+        assert_eq!(erts_offset, b"FAKE_EXE".len());
+        assert_eq!(&data[erts_offset..app_offset], b"ERTS_DATA");
+        assert_eq!(&data[app_offset..meta_offset], b"APP_DATA");
+
+        let meta_bytes = &data[meta_offset..data.len() - TRAILER_SIZE];
+        let (parsed, _): (Metadata, _) =
+            bincode::decode_from_slice(meta_bytes, bincode::config::standard()).unwrap();
+        assert_eq!(parsed.name, "my_app");
+        assert_eq!(parsed.erts_hash, "abc123");
     }
 }

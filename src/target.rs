@@ -1,6 +1,6 @@
 use std::{env, fmt, str::FromStr};
 
-use eyre::{Result, bail};
+use eyre::{Result, bail, eyre};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -40,25 +40,27 @@ impl Target {
     }
 
     #[must_use]
-    pub fn zig_target(&self) -> String {
-        match self.os {
-            Os::Linux(_) => format!("{}-linux-musl", self.arch),
-            _ => self.to_string(),
+    pub fn rust_target(&self) -> String {
+        match (&self.arch, &self.os) {
+            (arch, Os::Macos) => format!("{arch}-apple-darwin"),
+            (arch, Os::Windows) => format!("{arch}-pc-windows-msvc"),
+            (arch, Os::Linux(Libc::Glibc)) => format!("{arch}-unknown-linux-gnu"),
+            (arch, Os::Linux(Libc::Musl | Libc::Static)) => format!("{arch}-unknown-linux-musl"),
         }
     }
 
     pub fn current() -> eyre::Result<Self> {
-        let os = match env::consts::OS {
-            "linux" => Os::Linux(Libc::Static),
-            "macos" => Os::Macos,
-            "windows" => Os::Windows,
-            other => bail!("unsupported current OS '{other}'"),
-        };
-
         let arch = match env::consts::ARCH {
             "x86_64" => Arch::X86_64,
             "aarch64" => Arch::Aarch64,
             other => bail!("unsupported current architecture '{other}'"),
+        };
+
+        let os = match env::consts::OS {
+            "macos" => Os::Macos,
+            "windows" => Os::Windows,
+            "linux" => Os::Linux(Libc::Static),
+            other => bail!("unsupported current OS '{other}'"),
         };
 
         Ok(Self { os, arch })
@@ -71,7 +73,7 @@ impl FromStr for Target {
     fn from_str(s: &str) -> Result<Self> {
         let (arch_str, rest) = s
             .split_once('-')
-            .ok_or_else(|| eyre::eyre!("invalid target format '{s}': expected <arch>-<os>"))?;
+            .ok_or_else(|| eyre!("invalid target format '{s}': expected <arch>-<os>"))?;
 
         let arch = match arch_str {
             "x86_64" => Arch::X86_64,
@@ -249,6 +251,15 @@ mod test {
     }
 
     #[test]
+    fn test_invalid_libc_variant() {
+        let err = "x86_64-linux-foobar".parse::<Target>().unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "unsupported libc variant 'foobar': expected glibc, musl, or static"
+        );
+    }
+
+    #[test]
     fn test_aarch64_windows_parses() {
         let target = "aarch64-windows".parse::<Target>().unwrap();
         assert_eq!(target.arch, Arch::Aarch64);
@@ -271,18 +282,28 @@ mod test {
     }
 
     #[test]
-    fn test_zig_target() {
+    fn test_rust_target() {
         assert_eq!(
-            "x86_64-linux-glibc".parse::<Target>().unwrap().zig_target(),
-            "x86_64-linux-musl"
+            "x86_64-linux-glibc"
+                .parse::<Target>()
+                .unwrap()
+                .rust_target(),
+            "x86_64-unknown-linux-gnu"
         );
         assert_eq!(
-            "aarch64-linux-musl".parse::<Target>().unwrap().zig_target(),
-            "aarch64-linux-musl"
+            "x86_64-linux-static"
+                .parse::<Target>()
+                .unwrap()
+                .rust_target(),
+            "x86_64-unknown-linux-musl"
         );
         assert_eq!(
-            "aarch64-macos".parse::<Target>().unwrap().zig_target(),
-            "aarch64-macos"
+            "aarch64-macos".parse::<Target>().unwrap().rust_target(),
+            "aarch64-apple-darwin"
+        );
+        assert_eq!(
+            "x86_64-windows".parse::<Target>().unwrap().rust_target(),
+            "x86_64-pc-windows-msvc"
         );
     }
 }

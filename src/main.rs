@@ -104,6 +104,7 @@ struct ResolvedBuild {
     shipment_apps: HashMap<String, Vec<String>>,
     app_payload_path: Utf8PathBuf,
     app_hash: String,
+    zigbuild_version: Option<String>,
 }
 
 fn build(args: &BuildArgs) -> Result<()> {
@@ -133,7 +134,14 @@ fn build(args: &BuildArgs) -> Result<()> {
     };
     let strip_beam = project.resolve_strip_beam(cli_strip_beam);
     let compression_level = project.resolve_compression_level(args.compression_level)?;
-    let zig_version = queso::check_zig()?;
+
+    let zigbuild_version = if targets.iter().any(queso::is_cross_target) {
+        queso::check_zig()?;
+        Some(queso::check_cargo_zigbuild()?)
+    } else {
+        None
+    };
+
     let gleam_version = queso::check_gleam()?;
     let entry = project.resolve_entry(args.entry.as_deref());
     let full_erts = project.resolve_full_erts(args.full_erts);
@@ -144,7 +152,6 @@ fn build(args: &BuildArgs) -> Result<()> {
         "Building",
         &format!("{} v{}", project.name, project.version),
     )?;
-    printer.detail("Zig", &zig_version)?;
     printer.detail("Gleam", &gleam_version)?;
     printer.detail("Entry", &entry.entry_module)?;
 
@@ -189,6 +196,7 @@ fn build(args: &BuildArgs) -> Result<()> {
         shipment_apps,
         app_payload_path,
         app_hash,
+        zigbuild_version,
     };
 
     for target in &targets {
@@ -335,7 +343,6 @@ fn build_target(
         name: resolved.project.name.clone(),
         version: resolved.project.version.clone(),
         entry_module: resolved.entry.entry_module.clone(),
-        target,
         erts_version: erts.version.clone(),
         erts_hash,
         app_hash: resolved.app_hash.clone(),
@@ -347,15 +354,22 @@ fn build_target(
     let final_path = resolved.output_dir.join(&filename);
 
     let sp = printer.spinner("Compiling", "launcher");
-    queso::compile_launcher(
-        &target,
+    let launcher_path = queso::ensure_launcher(&target)?;
+    sp.finish_and_clear();
+    printer.status("Compiled", "launcher")?;
+    if let Some(version) = &resolved.zigbuild_version {
+        printer.detail("cargo-zigbuild", version)?;
+    }
+
+    let sp = printer.spinner("Assembling", "binary");
+    queso::assemble_binary(
+        &launcher_path,
         &erts_payload_path,
         &resolved.app_payload_path,
         &meta,
         &final_path,
     )?;
     sp.finish_and_clear();
-    printer.status("Compiled", "launcher")?;
 
     let binary_size = fs::metadata(&final_path)?.len();
     printer.detail("Binary", HumanBytes(binary_size).to_string().as_str())?;

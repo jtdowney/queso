@@ -168,9 +168,7 @@ fn file_mode(path: impl AsRef<Utf8Path>) -> u32 {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::metadata(path)
-            .map(|m| m.permissions().mode())
-            .unwrap_or(0o644)
+        std::fs::metadata(path).map_or(0o644, |m| m.permissions().mode())
     }
     #[cfg(not(unix))]
     {
@@ -354,7 +352,7 @@ mod test {
     }
 
     const LINUX_TARGET: Target = Target {
-        os: Os::Linux(Libc::Static),
+        os: Os::Linux(Libc::Musl),
         arch: Arch::X86_64,
     };
 
@@ -395,7 +393,7 @@ mod test {
             .collect();
 
         let entries = build_and_read_erts_entries(&mut erl, &erts, Some(&allowed));
-        insta::assert_yaml_snapshot!(entries, @r"
+        insta::assert_yaml_snapshot!(entries, @"
         - erts-16.3/bin/erl
         - lib/kernel-10.6.1/ebin/kernel.beam
         ");
@@ -431,7 +429,7 @@ mod test {
             .collect();
 
         let entries = build_and_read_erts_entries(&mut erl, &erts, Some(&allowed));
-        insta::assert_yaml_snapshot!(entries, @r"
+        insta::assert_yaml_snapshot!(entries, @"
         - erts-16.3/bin/erl
         - lib/kernel-10.6.1/ebin/kernel.beam
         ");
@@ -468,7 +466,7 @@ mod test {
             .collect();
 
         let entries = build_and_read_erts_entries(&mut erl, &erts, Some(&allowed));
-        insta::assert_yaml_snapshot!(entries, @r"
+        insta::assert_yaml_snapshot!(entries, @"
         - erts-16.3/bin/erl
         - erts-16.3/ebin/init.beam
         ");
@@ -501,7 +499,7 @@ mod test {
             .collect();
 
         let entries = build_and_read_erts_entries(&mut erl, &erts, Some(&allowed));
-        insta::assert_yaml_snapshot!(entries, @r"
+        insta::assert_yaml_snapshot!(entries, @"
         - erts-16.3/bin/beam.smp
         - erts-16.3/bin/erl
         - erts-16.3/bin/erl_child_setup
@@ -550,7 +548,7 @@ mod test {
             .collect();
 
         let entries = build_and_read_erts_entries(&mut erl, &erts, Some(&allowed));
-        insta::assert_yaml_snapshot!(entries, @r"
+        insta::assert_yaml_snapshot!(entries, @"
         - erts-16.3/bin/erl
         - lib/kernel-10.6.1/ebin/kernel.beam
         - releases/28/no_dot_erlang.boot

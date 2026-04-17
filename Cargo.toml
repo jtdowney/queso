@@ -11,7 +11,14 @@ keywords = ["gleam", "erlang", "beam", "packaging"]
 categories = ["development-tools::build-utils", "command-line-utilities"]
 exclude = ["tests/", "scripts/", ".github/"]
 
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_errors_doc = "allow"
+implicit_hasher = "allow"
+
 [dependencies]
+bincode = { version = "2", default-features = false, features = ["std", "derive"] }
+byteorder = "1"
 camino = "1"
 camino-tempfile = "1"
 clap = { version = "4", features = ["derive"] }
@@ -39,16 +46,17 @@ quickcheck = "1"
 quickcheck_macros = "1"
 regex = "1"
 
-[lints.clippy]
-pedantic = { level = "warn", priority = -1 }
-missing_errors_doc = "allow"
-implicit_hasher = "allow"
+[build-dependencies]
+camino = "1"
+eyre = "0.6.12"
+hex = "0.4.3"
+sha2 = "0.11.0"
+tar = "0.4.45"
+walkdir = "2"
+zstd = "0.13.3"
 
 [profile.release]
-lto = "fat"
-codegen-units = 1
-opt-level = "z"
-panic = "abort"
+lto = true
 strip = true
 
 [profile.dev.package.insta]
