@@ -54,11 +54,6 @@ impl Entrypoint {
             beam_file,
         }
     }
-
-    #[must_use]
-    pub fn main_string(&self) -> String {
-        format!("'{}':main()", self.entry_module)
-    }
 }
 
 impl Project {
@@ -304,7 +299,6 @@ mod test {
             let expected_erlang = parts.join("@");
             entry.entry_module == expected_erlang
                 && entry.beam_file == format!("{expected_erlang}.beam")
-                && entry.main_string() == format!("'{expected_erlang}':main()")
         }
         quickcheck::quickcheck(prop as fn(Vec<String>) -> bool);
     }

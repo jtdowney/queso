@@ -4,8 +4,8 @@ use console::{Style, Term, measure_text_width, style};
 use eyre::Result;
 use indicatif::{ProgressBar, ProgressStyle};
 
-const STATUS_WIDTH: usize = 11;
-const HEADER_WIDTH: usize = 40;
+const STATUS_WIDTH: usize = 15;
+const HEADER_WIDTH: usize = 44;
 
 pub struct Printer {
     term: Term,
@@ -81,13 +81,13 @@ mod test {
     #[test]
     fn test_status_output() {
         let output = strip_ansi_codes(&format_status("Building", "my_app v1.0.0")).to_string();
-        insta::assert_snapshot!(output, @"   Building my_app v1.0.0");
+        insta::assert_snapshot!(output, @"       Building my_app v1.0.0");
     }
 
     #[test]
     fn test_detail_output() {
         let output = strip_ansi_codes(&format_detail("OTP", "OTP-28.4.1")).to_string();
-        insta::assert_snapshot!(output, @"        OTP OTP-28.4.1");
+        insta::assert_snapshot!(output, @"            OTP OTP-28.4.1");
     }
 
     #[test]
@@ -95,7 +95,7 @@ mod test {
         let output = strip_ansi_codes(&format_header("x86_64-windows")).to_string();
         insta::assert_snapshot!(output, @"
 
-        ── x86_64-windows ────────────────────
+        ── x86_64-windows ────────────────────────
         ");
     }
 }

@@ -1,0 +1,28 @@
+[package]
+name = "queso-launcher"
+version = "0.2.0"
+edition = "2024"
+publish = false
+resolver = "3"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_errors_doc = "allow"
+implicit_hasher = "allow"
+
+[dependencies]
+bincode = { version = "2", default-features = false, features = ["std", "derive"] }
+byteorder = "1"
+camino = "1"
+camino-tempfile = "1"
+directories = "6"
+eyre = "0.6.12"
+tar = { version = "0.4.45", default-features = false }
+zstd = { version = "0.13.3", default-features = false }
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"

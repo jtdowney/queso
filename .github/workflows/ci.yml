@@ -20,6 +20,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo fmt --check
+        working-directory: launcher
+      - run: cargo clippy --all-targets -- -D warnings
+        working-directory: launcher
+      - run: cargo check --locked --all-targets
+        working-directory: launcher
 
   test:
     name: Test
@@ -33,6 +39,8 @@ jobs:
         with:
           otp-version: "28"
       - run: cargo test
+      - run: cargo test
+        working-directory: launcher
 
   e2e:
     name: E2E (${{ matrix.runner }})
@@ -55,9 +63,12 @@ jobs:
         with:
           otp-version: "28"
           gleam-version: "1.15.4"
-      - uses: mlugg/setup-zig@v2
-        with:
-          version: "0.16.0"
+      - name: Install musl toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          rustup target add "$(uname -m)-unknown-linux-musl"
       - name: Run E2E test
         shell: bash
         run: bash scripts/e2e-test.sh
@@ -69,6 +80,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin,x86_64-pc-windows-gnu
       - uses: Swatinem/rust-cache@v2
       - uses: erlef/setup-beam@v1
         with:
@@ -77,6 +90,9 @@ jobs:
       - uses: mlugg/setup-zig@v2
         with:
           version: "0.16.0"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
       - name: Build queso
         run: cargo build --release
       - name: Cross-compile test app

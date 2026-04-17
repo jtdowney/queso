@@ -10,4 +10,4 @@ exit_code: 0
 ----- stdout -----
 
 ----- stderr -----
-    Removed [TEMPDIR]/build/queso (11 B)
+        Removed [TEMPDIR]/build/queso (11 B)
