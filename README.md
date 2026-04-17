@@ -31,16 +31,6 @@ Hello from my_app!
 
 Download a prebuilt binary from the [latest release](https://github.com/jtdowney/queso/releases/latest), extract it, and place it somewhere on your PATH.
 
-Binaries are available for:
-
-- `aarch64-apple-darwin` (macOS Apple Silicon)
-- `x86_64-apple-darwin` (macOS Intel)
-- `x86_64-unknown-linux-gnu` (Linux x86_64, dynamically linked)
-- `aarch64-unknown-linux-gnu` (Linux ARM64, dynamically linked)
-- `x86_64-unknown-linux-musl` (Linux x86_64, statically linked)
-- `aarch64-unknown-linux-musl` (Linux ARM64, statically linked)
-- `x86_64-pc-windows-msvc` (Windows x86_64)
-
 ### Cargo (build from source)
 
 With [Rust](https://rustup.rs) installed:
