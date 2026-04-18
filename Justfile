@@ -7,8 +7,8 @@ pack-launcher:
 
 # Dry-run cargo release (no publish, no tag)
 release-dry-run: pack-launcher
-    cargo release
+    cargo release --allow-dirty
 
 # Publish a new version, e.g. `just release 0.4.0`
 release version: pack-launcher
-    cargo release {{version}} --execute
+    cargo release {{version}} --execute --allow-dirty
