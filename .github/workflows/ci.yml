@@ -37,7 +37,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "28"
+          otp-version: "29"
       - run: cargo test
       - run: cargo test
         working-directory: launcher
@@ -61,8 +61,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "28"
-          gleam-version: "1.15.4"
+          otp-version: "29"
+          gleam-version: "1.17"
       - name: Install musl toolchain (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -85,8 +85,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "28"
-          gleam-version: "1.15.4"
+          otp-version: "29"
+          gleam-version: "1.17"
       - uses: mlugg/setup-zig@v2
         with:
           version: "0.16.0"
