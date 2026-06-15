@@ -63,7 +63,6 @@ fn validate_boot_path(s: &str) -> Result<()> {
 }
 
 #[derive(Debug, Clone, Copy)]
-#[repr(C)]
 #[allow(clippy::struct_field_names)]
 pub struct Trailer {
     pub erts_offset: u64,

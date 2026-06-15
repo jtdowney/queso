@@ -212,45 +212,34 @@ fn clean() -> Result<()> {
         .map_err(|p| eyre!("non-UTF-8 working directory: {}", p.display()))?;
     let project = Project::load(&cwd)?;
     let dir = project.root.join("build").join("queso");
-
-    if !dir.exists() {
-        printer.status("Clean", "no build artifacts found")?;
-        return Ok(());
-    }
-
-    let size: u64 = walkdir::WalkDir::new(&dir)
-        .into_iter()
-        .filter_map(Result::ok)
-        .filter(|e| e.file_type().is_file())
-        .filter_map(|e| e.metadata().ok())
-        .map(|m| m.len())
-        .sum();
-
-    fs::remove_dir_all(&dir)?;
-    printer.status("Removed", &format!("{} ({})", dir, HumanBytes(size)))?;
-
-    Ok(())
+    remove_and_report(&printer, &dir, "no build artifacts found")
 }
 
 fn cache_clean() -> Result<()> {
     let printer = cli::Printer::stderr();
     let dir = queso::cache_dir()?;
+    remove_and_report(&printer, &dir, "no cache directory found")
+}
 
-    if !dir.exists() {
-        printer.status("Clean", "no cache directory found")?;
-        return Ok(());
-    }
-
-    let size: u64 = walkdir::WalkDir::new(&dir)
+fn dir_size(dir: &Utf8Path) -> u64 {
+    walkdir::WalkDir::new(dir)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| e.file_type().is_file())
         .filter_map(|e| e.metadata().ok())
         .map(|m| m.len())
-        .sum();
+        .sum()
+}
 
-    fs::remove_dir_all(&dir)?;
-    printer.status("Removed", &format!("{} ({})", dir, HumanBytes(size)))?;
+fn remove_and_report(printer: &cli::Printer, dir: &Utf8Path, empty_msg: &str) -> Result<()> {
+    if !dir.exists() {
+        printer.status("Clean", empty_msg)?;
+        return Ok(());
+    }
+
+    let size = dir_size(dir);
+    fs::remove_dir_all(dir)?;
+    printer.status("Removed", &format!("{dir} ({})", HumanBytes(size)))?;
 
     Ok(())
 }
