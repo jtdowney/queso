@@ -59,6 +59,15 @@ jobs:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Pin ImageOS for new runner images # drop once setup-beam recognizes win25-vs2026/ubuntu24-arm64
+        shell: bash
+        env:
+          RUNNER: ${{ matrix.runner }}
+        run: |
+          case "$RUNNER" in
+            windows-latest)   echo "ImageOS=win25"    >> "$GITHUB_ENV" ;;
+            ubuntu-24.04-arm) echo "ImageOS=ubuntu24" >> "$GITHUB_ENV" ;;
+          esac
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "29"
