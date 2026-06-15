@@ -1,7 +1,6 @@
 use std::{
     fs::{self, File},
     io::{self, Read},
-    path::{self, PathBuf},
 };
 
 use camino::{Utf8Path, Utf8PathBuf};
@@ -212,69 +211,19 @@ fn download(url: &str, dest: impl AsRef<Utf8Path>) -> Result<String> {
 }
 
 fn extract_tar_gz(reader: impl Read, dest: impl AsRef<Utf8Path>) -> Result<()> {
-    let dest = dest.as_ref();
     let decoder = flate2::read::GzDecoder::new(reader);
     let mut archive = tar::Archive::new(decoder);
-
-    for entry in archive.entries()? {
-        let mut entry = entry?;
-        let path = entry.path()?.into_owned();
-
-        let normalized: PathBuf = path
-            .components()
-            .filter(|c| matches!(c, path::Component::Normal(_)))
-            .collect();
-        if normalized.as_os_str().is_empty() {
-            continue;
-        }
-
-        let dest_path = dest.as_std_path().join(&normalized);
-        if let Some(parent) = dest_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        if entry.header().entry_type().is_dir() {
-            fs::create_dir_all(&dest_path)?;
-        } else if entry.header().entry_type().is_file() {
-            let mut file = File::create(&dest_path)?;
-            io::copy(&mut entry, &mut file)?;
-
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                if let Ok(mode) = entry.header().mode() {
-                    fs::set_permissions(&dest_path, fs::Permissions::from_mode(mode))?;
-                }
-            }
-        }
-    }
-
+    archive
+        .unpack(dest.as_ref().as_std_path())
+        .wrap_err("failed to extract ERTS archive")?;
     Ok(())
 }
 
 fn extract_zip(file: File, dest: impl AsRef<Utf8Path>) -> Result<()> {
-    let dest = dest.as_ref();
     let mut archive = zip::ZipArchive::new(file).wrap_err("failed to open zip archive")?;
-
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i)?;
-        let Some(path) = file.enclosed_name() else {
-            continue;
-        };
-
-        let dest_path = dest.as_std_path().join(&path);
-
-        if file.is_dir() {
-            fs::create_dir_all(&dest_path)?;
-        } else {
-            if let Some(parent) = dest_path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            let mut out = File::create(&dest_path)?;
-            io::copy(&mut file, &mut out)?;
-        }
-    }
-
+    archive
+        .extract(dest.as_ref().as_std_path())
+        .wrap_err("failed to extract ERTS archive")?;
     Ok(())
 }
 

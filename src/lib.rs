@@ -304,25 +304,9 @@ fn extract_launcher_source(dest: &Utf8Path) -> Result<()> {
     let decoder =
         zstd::Decoder::new(LAUNCHER_SOURCE).wrap_err("failed to decompress launcher source")?;
     let mut archive = tar::Archive::new(decoder);
-
-    for entry in archive
-        .entries()
-        .wrap_err("failed to read launcher source archive")?
-    {
-        let mut entry = entry?;
-        let path = entry.path()?.into_owned();
-        let dest_path = dest.as_std_path().join(&path);
-
-        if let Some(parent) = dest_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        if entry.header().entry_type().is_file() {
-            let mut file = File::create(&dest_path)?;
-            io::copy(&mut entry, &mut file)?;
-        }
-    }
-
+    archive
+        .unpack(dest.as_std_path())
+        .wrap_err("failed to extract launcher source archive")?;
     Ok(())
 }
 
