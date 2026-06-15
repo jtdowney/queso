@@ -55,7 +55,7 @@ zstd = "0.13.3"
 [dev-dependencies]
 camino-tempfile-ext = "0.3.3"
 insta = { version = "1", features = ["yaml", "filters"] }
-insta-cmd = "0.6.0"
+insta-cmd = "0.7.0"
 quickcheck = "1"
 quickcheck_macros = "1"
 regex = "1"
