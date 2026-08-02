@@ -368,8 +368,7 @@ fn assemble_binary_inner(
     io::copy(&mut File::open(app_payload_path)?, &mut out)?;
 
     let meta = out.stream_position()?;
-    let meta_bytes = bincode::encode_to_vec(metadata, bincode::config::standard())
-        .wrap_err("failed to serialize metadata")?;
+    let meta_bytes = bitcode::encode(metadata);
     out.write_all(&meta_bytes)?;
 
     let trailer = Trailer {
@@ -529,8 +528,7 @@ mod test {
         assert_eq!(&data[app_offset..meta_offset], b"APP_DATA");
 
         let meta_bytes = &data[meta_offset..data.len() - TRAILER_SIZE];
-        let (parsed, _): (Metadata, _) =
-            bincode::decode_from_slice(meta_bytes, bincode::config::standard()).unwrap();
+        let parsed: Metadata = bitcode::decode(meta_bytes).unwrap();
         assert_eq!(parsed.name, "my_app");
         assert_eq!(parsed.erts_hash, "abc123");
     }

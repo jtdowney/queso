@@ -1,6 +1,6 @@
 use std::io::{Read, Seek, SeekFrom, Write};
 
-use bincode::{Decode, Encode};
+use bitcode::{Decode, Encode};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use eyre::{Result, bail, ensure};
 
@@ -362,7 +362,7 @@ mod test {
     #[test]
     fn test_trailer_metadata_combined_read() {
         let m = sample_metadata();
-        let meta_bytes = bincode::encode_to_vec(&m, bincode::config::standard()).unwrap();
+        let meta_bytes = bitcode::encode(&m);
 
         let erts = b"ERTS_DATA";
         let app = b"APP_DATA";
@@ -390,8 +390,7 @@ mod test {
         let meta_start = usize::try_from(read_trailer.meta_offset).unwrap();
         let meta_len = usize::try_from(meta_end - read_trailer.meta_offset).unwrap();
         let meta_slice = &buf[meta_start..meta_start + meta_len];
-        let (decoded, _): (Metadata, _) =
-            bincode::decode_from_slice(meta_slice, bincode::config::standard()).unwrap();
+        let decoded: Metadata = bitcode::decode(meta_slice).unwrap();
         decoded.validate().unwrap();
         assert_eq!(decoded.name, m.name);
         assert_eq!(decoded.boot_path, m.boot_path);

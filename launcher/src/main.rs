@@ -90,8 +90,7 @@ fn read_metadata(file: &mut File, trailer: &Trailer) -> Result<Metadata> {
     let mut meta_bytes = vec![0u8; meta_len];
     file.read_exact(&mut meta_bytes)?;
 
-    let (metadata, _): (Metadata, _) =
-        bincode::decode_from_slice(&meta_bytes, bincode::config::standard())?;
+    let metadata: Metadata = bitcode::decode(&meta_bytes)?;
     metadata.validate()?;
     Ok(metadata)
 }
@@ -327,7 +326,7 @@ mod test {
     }
 
     fn write_test_binary(path: &Utf8Path, erts: &[u8], app: &[u8], meta: &Metadata) -> Trailer {
-        let meta_bytes = bincode::encode_to_vec(meta, bincode::config::standard()).unwrap();
+        let meta_bytes = bitcode::encode(meta);
         let erts_offset = 0u64;
         let app_offset = erts_offset + u64::try_from(erts.len()).unwrap();
         let meta_offset = app_offset + u64::try_from(app.len()).unwrap();
