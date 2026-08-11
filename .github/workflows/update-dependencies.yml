@@ -22,20 +22,32 @@ jobs:
       - name: Update dependencies
         run: |
           SUMMARY="$RUNNER_TEMP/update-summary.md"
-          echo "## Dependency Updates" > "$SUMMARY"
-          echo "" >> "$SUMMARY"
+          DETAILS="$RUNNER_TEMP/update-details.md"
+          STATUS=0
 
-          if UPDATE_OUTPUT=$(cargo update 2>&1); then
-            echo "✅ Dependencies updated successfully" >> "$SUMMARY"
-          else
-            echo "⚠️ Some updates may have failed" >> "$SUMMARY"
-          fi
+          : > "$DETAILS"
+          for MANIFEST in Cargo.toml launcher/Cargo.toml; do
+            OUTPUT=$(cargo update --manifest-path "$MANIFEST" 2>&1) || STATUS=1
+            {
+              echo "#### $MANIFEST"
+              echo '```'
+              echo "$OUTPUT"
+              echo '```'
+            } >> "$DETAILS"
+          done
 
-          echo "" >> "$SUMMARY"
-          echo "### Changes" >> "$SUMMARY"
-          echo '```' >> "$SUMMARY"
-          echo "$UPDATE_OUTPUT" >> "$SUMMARY"
-          echo '```' >> "$SUMMARY"
+          {
+            echo "## Dependency Updates"
+            echo ""
+            if [ "$STATUS" -eq 0 ]; then
+              echo "✅ Dependencies updated successfully"
+            else
+              echo "⚠️ Some updates may have failed"
+            fi
+            echo ""
+            echo "### Changes"
+            cat "$DETAILS"
+          } > "$SUMMARY"
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
