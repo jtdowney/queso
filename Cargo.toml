@@ -49,7 +49,7 @@ tar = "0.4.46"
 toml = "1"
 ureq = "3"
 walkdir = "2"
-zip = "8"
+zip = "9"
 zstd = "0.13.3"
 
 [dev-dependencies]
