@@ -189,7 +189,7 @@ mod test {
     fn test_spawn_and_get_otp_version() {
         let mut erl = Erl::spawn().unwrap();
         let version = erl.get_otp_version().unwrap();
-        assert!(!version.is_empty());
+        assert_ne!(version, "");
         assert!(version.chars().next().unwrap().is_ascii_digit());
     }
 

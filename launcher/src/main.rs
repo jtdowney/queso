@@ -322,7 +322,7 @@ mod test {
     fn test_add_lib_paths_no_lib_dir() {
         let dir = camino_tempfile::tempdir().unwrap();
         let paths = add_lib_paths(dir.path());
-        assert!(paths.is_empty());
+        assert_eq!(paths, Vec::<String>::new());
     }
 
     fn write_test_binary(path: &Utf8Path, erts: &[u8], app: &[u8], meta: &Metadata) -> Trailer {
