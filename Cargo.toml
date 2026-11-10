@@ -4,7 +4,7 @@ exclude = ["launcher"]
 
 [package]
 name = "queso"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 authors = ["John Downey <jdowney@gmail.com>"]
 description = "Package Gleam apps into single native executables"
