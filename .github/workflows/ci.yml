@@ -26,6 +26,8 @@ jobs:
         working-directory: launcher
       - run: cargo check --locked --all-targets
         working-directory: launcher
+      - name: Check launcher-source.tar.zst is up to date
+        run: cargo xtask pack-launcher && git diff --exit-code launcher-source.tar.zst
 
   test:
     name: Test
