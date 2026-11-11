@@ -54,7 +54,7 @@ jobs:
           - macos-latest
           - macos-26-intel
           - ubuntu-latest
-          - ubuntu-24.04-arm
+          - ubuntu-26.04-arm
           - windows-latest
     runs-on: ${{ matrix.runner }}
     steps:
