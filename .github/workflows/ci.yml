@@ -63,8 +63,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: erlef/setup-beam@v1
         with:
-          # https://github.com/gleam-community/erlang-linux-builds/issues/2
-          otp-version: "29.1.1"
+          otp-version: "29"
           gleam-version: "1.18"
       - name: Install musl toolchain (Linux)
         if: runner.os == 'Linux'
